@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c \"dir /s /b C:\\\\Users\\\\Evand\\\\*squad* 2>nul\")",
+      "Bash(cmd /c \"dir /s /b C:\\\\Users\\\\Evand\\\\*xquad* 2>nul\")",
+      "Bash(gh repo *)",
+      "Bash(curl -s \"https://api.github.com/users/crissuboy-arch/repos\")",
+      "Read(//c/tmp/**)",
+      "Bash(unzip -o \"/c/Users/Evand/Downloads/xquads-squads-main.zip\" -d xquads)",
+      "Bash(npm run *)"
+    ]
+  }
+}
