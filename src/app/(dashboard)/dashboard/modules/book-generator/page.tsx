@@ -565,27 +565,27 @@ export default function BookGeneratorPage() {
                   const isOpen = expandedChapter === i;
                   return (
                     <Card key={i} className="border-none shadow-sm border border-slate-100 overflow-hidden">
-                      <button
-                        type="button"
-                        className="w-full text-left"
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className={`px-6 py-3 flex flex-row items-center justify-between cursor-pointer transition-colors ${isOpen ? colors.bg : "hover:bg-slate-50/80"}`}
                         onClick={() => setExpandedChapter(isOpen ? null : i)}
+                        onKeyDown={(e) => e.key === "Enter" && setExpandedChapter(isOpen ? null : i)}
                       >
-                        <CardHeader className={`pb-3 pt-3 flex flex-row items-center justify-between transition-colors ${isOpen ? colors.bg : "hover:bg-slate-50/80"}`}>
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${isOpen ? `${colors.badge}` : "bg-slate-100 text-slate-500"}`}>
-                              {i + 1}
-                            </span>
-                            <CardTitle className={`text-sm font-semibold ${isOpen ? colors.text : "text-slate-700"}`}>
-                              {ch.title}
-                            </CardTitle>
-                          </div>
-                          {isOpen ? (
-                            <ChevronUp className={`w-4 h-4 shrink-0 ${colors.text}`} />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
-                          )}
-                        </CardHeader>
-                      </button>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isOpen ? colors.badge : "bg-slate-100 text-slate-500"}`}>
+                            {i + 1}
+                          </span>
+                          <span className={`text-sm font-semibold ${isOpen ? colors.text : "text-slate-700"}`}>
+                            {ch.title}
+                          </span>
+                        </div>
+                        {isOpen ? (
+                          <ChevronUp className={`w-4 h-4 shrink-0 ${colors.text}`} />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
+                        )}
+                      </div>
                       {isOpen && (
                         <CardContent className="pt-2 pb-5">
                           <div className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
