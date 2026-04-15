@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { 
-  BarChart, 
-  LayoutDashboard, 
-  Lightbulb, 
-  Megaphone, 
-  Package, 
-  PenTool, 
-  Search, 
-  Settings, 
-  ShoppingCart, 
+import {
+  BarChart,
+  BookOpen,
+  LayoutDashboard,
+  Lightbulb,
+  Megaphone,
+  Package,
+  PenTool,
+  Search,
+  ShoppingCart,
   Wand2,
   Folder
 } from "lucide-react";
@@ -79,9 +79,10 @@ const routes = [
     color: "text-yellow-500",
   },
   {
-    label: "Settings",
-    icon: Settings,
-    href: "/dashboard/settings",
+    label: "Gerador de Livros",
+    icon: BookOpen,
+    href: "/dashboard/modules/book-generator",
+    color: "text-indigo-500",
   },
 ];
 

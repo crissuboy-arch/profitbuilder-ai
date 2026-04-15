@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { generateSalesPage, saveSalesPageToProject, type SalesPageResult } from "./actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,7 +13,14 @@ import { LanguageSelect } from "@/components/shared/LanguageSelect";
 import { toast } from "sonner";
 import { Loader2, FileText, LayoutTemplate, Quote, ShieldCheck, HelpCircle, CheckCircle2, Save, MousePointerClick, TrendingUp } from "lucide-react";
 
-export default function SalesPageGenerator() {
+function SalesPageGeneratorContent() {
+  const searchParams = useSearchParams();
+
+  const prefillConcept = searchParams.get("concept") || "";
+  const prefillAudience = searchParams.get("audience") || "";
+  const prefillPrice = searchParams.get("price") || "";
+  const prefillMechanism = searchParams.get("mechanism") || "";
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SalesPageResult | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState("");
@@ -44,7 +52,7 @@ export default function SalesPageGenerator() {
     } else {
       toast.error(error || "Failed to generate sales page copy.");
     }
-    
+
     setLoading(false);
   }
 
@@ -52,7 +60,7 @@ export default function SalesPageGenerator() {
     if (!result) return;
     toast.loading("Saving to project...", { id: "save-sales-page" });
     const { success, message, error } = await saveSalesPageToProject(result, currentProjectName);
-    
+
     if (success) {
       toast.success(message, { id: "save-sales-page" });
     } else {
@@ -72,8 +80,15 @@ export default function SalesPageGenerator() {
         </div>
       </div>
 
+      {prefillConcept && (
+        <div className="mb-6 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          Dados importados do Product Builder. Revise e clique em &quot;Generate Sales Page&quot;.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        
+
         {/* Left Column - Input Form */}
         <Card className="xl:col-span-4 h-fit sticky top-24 border-none shadow-md">
           <CardHeader>
@@ -84,39 +99,53 @@ export default function SalesPageGenerator() {
             <form action={onSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="productConcept">Core Product Concept</Label>
-                <Textarea 
-                  id="productConcept" 
-                  name="productConcept" 
-                  placeholder="e.g., A comprehensive online course designed for established agency owners..." 
+                <Textarea
+                  id="productConcept"
+                  name="productConcept"
+                  placeholder="e.g., A comprehensive online course designed for established agency owners..."
                   className="min-h-[100px]"
-                  required 
+                  defaultValue={prefillConcept}
+                  required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="targetAudience">Target Audience</Label>
-                <Input id="targetAudience" name="targetAudience" placeholder="e.g., Struggling Agency Owners" required />
+                <Input
+                  id="targetAudience"
+                  name="targetAudience"
+                  placeholder="e.g., Struggling Agency Owners"
+                  defaultValue={prefillAudience}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="price">Offer Price</Label>
-                <Input id="price" name="price" placeholder="e.g., $997" required />
+                <Input
+                  id="price"
+                  name="price"
+                  placeholder="e.g., $997"
+                  defaultValue={prefillPrice}
+                  required
+                />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="uniqueMechanism">Unique Selling Mechanism</Label>
-                <Textarea 
-                  id="uniqueMechanism" 
-                  name="uniqueMechanism" 
-                  placeholder='e.g., The "Reverse-Engineering Drop" protocol' 
+                <Textarea
+                  id="uniqueMechanism"
+                  name="uniqueMechanism"
+                  placeholder='e.g., The "Reverse-Engineering Drop" protocol'
                   className="min-h-[80px]"
-                  required 
+                  defaultValue={prefillMechanism}
+                  required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2 border-slate-100">
-                  <CountrySelect />
-                  <LanguageSelect />
+                <CountrySelect />
+                <LanguageSelect />
               </div>
 
               <Button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg mt-6" disabled={loading}>
@@ -160,13 +189,13 @@ export default function SalesPageGenerator() {
 
           {result && !loading && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              
+
               <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                 <div className="flex items-center gap-2 text-rose-600 font-medium tracking-tight">
                   <CheckCircle2 className="w-5 h-5" />
                   Sales Copy Generated
                 </div>
-                 <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
                   <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
                     Language: {parsedLanguage}
                   </span>
@@ -288,10 +317,10 @@ export default function SalesPageGenerator() {
               </div>
 
               <div className="flex justify-center p-8">
-                 <Button className="bg-rose-600 hover:bg-rose-700 text-white shadow-xl text-lg px-8 py-6 rounded-full font-bold flex items-center gap-2">
-                    <MousePointerClick className="w-5 h-5" />
-                    {result.callsToAction[1]}
-                  </Button>
+                <Button className="bg-rose-600 hover:bg-rose-700 text-white shadow-xl text-lg px-8 py-6 rounded-full font-bold flex items-center gap-2">
+                  <MousePointerClick className="w-5 h-5" />
+                  {result.callsToAction[1]}
+                </Button>
               </div>
 
             </div>
@@ -299,5 +328,13 @@ export default function SalesPageGenerator() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SalesPageGenerator() {
+  return (
+    <Suspense>
+      <SalesPageGeneratorContent />
+    </Suspense>
   );
 }

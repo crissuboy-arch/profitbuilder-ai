@@ -20,12 +20,6 @@ export default async function SignupPage({
   const { message, error } = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 font-[family-name:var(--font-geist-sans)] p-4">
-      <script dangerouslySetInnerHTML={{ __html: `
-        console.log("Signup page loaded");
-        document.addEventListener("submit", (e) => {
-          console.log("Form submit event triggered", e.target);
-        });
-      `}} />
         <form action={signup} className="w-full max-w-md">
           <Card className="shadow-xl border-slate-200">
             <CardHeader className="space-y-3 text-center">
