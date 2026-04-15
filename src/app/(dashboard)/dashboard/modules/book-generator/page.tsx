@@ -28,6 +28,10 @@ const LANGUAGE_OPTIONS = [
 
 const GENRE_OPTIONS = [
   { value: "Romance", label: "Romance" },
+  { value: "Romance de Mafia", label: "Romance de Máfia" },
+  { value: "CEO Romance", label: "CEO Romance" },
+  { value: "Dark Romance", label: "Dark Romance" },
+  { value: "Suspense Romântico", label: "Suspense Romântico" },
   { value: "Thriller", label: "Thriller" },
   { value: "Fantasia", label: "Fantasia" },
   { value: "Autoajuda", label: "Autoajuda" },
@@ -35,11 +39,15 @@ const GENRE_OPTIONS = [
 ];
 
 const GENRE_COLORS: Record<string, { bg: string; text: string; badge: string }> = {
-  Romance:   { bg: "bg-rose-50",    text: "text-rose-700",    badge: "bg-rose-100 text-rose-700" },
-  Thriller:  { bg: "bg-slate-50",   text: "text-slate-700",   badge: "bg-slate-200 text-slate-800" },
-  Fantasia:  { bg: "bg-violet-50",  text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
-  Autoajuda: { bg: "bg-amber-50",   text: "text-amber-700",   badge: "bg-amber-100 text-amber-700" },
-  Contos:    { bg: "bg-emerald-50", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
+  Romance:              { bg: "bg-rose-50",    text: "text-rose-700",    badge: "bg-rose-100 text-rose-700" },
+  "Romance de Mafia":   { bg: "bg-red-950/10", text: "text-red-800",     badge: "bg-red-100 text-red-800" },
+  "CEO Romance":        { bg: "bg-sky-50",     text: "text-sky-800",     badge: "bg-sky-100 text-sky-800" },
+  "Dark Romance":       { bg: "bg-purple-950/10", text: "text-purple-900", badge: "bg-purple-100 text-purple-900" },
+  "Suspense Romântico": { bg: "bg-teal-50",    text: "text-teal-800",    badge: "bg-teal-100 text-teal-800" },
+  Thriller:             { bg: "bg-slate-50",   text: "text-slate-700",   badge: "bg-slate-200 text-slate-800" },
+  Fantasia:             { bg: "bg-violet-50",  text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
+  Autoajuda:            { bg: "bg-amber-50",   text: "text-amber-700",   badge: "bg-amber-100 text-amber-700" },
+  Contos:               { bg: "bg-emerald-50", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
 };
 
 export default function BookGeneratorPage() {

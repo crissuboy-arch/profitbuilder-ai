@@ -46,6 +46,14 @@ const GENRE_SPECIALISTS: Record<string, string> = {
     "Park Howell (Brand Story Cycle, ABT: And→But→Therefore) and Nancy Duarte (audience as hero, transformation narrative).",
   Contos:
     "Matthew Dicks (homework for life method, finding stories in ordinary moments) and Keith Johnstone (spontaneity, status, improv narrative).",
+  "Romance de Mafia":
+    "Kindra Hall (forbidden desire and emotional stakes) and Blake Snyder (save-the-cat anti-hero, dark beat sheet, moral ambiguity).",
+  "CEO Romance":
+    "Kindra Hall (power dynamics and emotional vulnerability) and Oren Klaff (frame control, status, high-stakes negotiation as romantic tension).",
+  "Dark Romance":
+    "Shawn Coyne (value shifts from positive to deeply negative, moral complexity) and Matthew Dicks (raw emotional truth, taboo personal narrative).",
+  "Suspense Romântico":
+    "Blake Snyder (thriller structure, tension beats, ticking clock) and Kindra Hall (romantic emotional core woven into suspense escalation).",
 };
 
 function loadStoryChief(): { activation: string; principles: string } {
@@ -88,6 +96,14 @@ export async function generateBook(
         "Provide practical advice, real-world examples, and actionable steps in each chapter. Use an empathetic, motivational tone.",
       Contos:
         "Write vivid self-contained stories per chapter sharing a common theme. Each chapter is an independent tale.",
+      "Romance de Mafia":
+        "Write a forbidden romance set in the criminal underworld. The hero is a powerful, dangerous mafia boss; the heroine is drawn into his world against her will but falls irresistibly. Include power imbalance, protection, possessiveness, moral greyness, steamy tension, and loyalty-above-all. Style: Brazilian Dreame/99Novels popular romance — fast-paced chapters, cliffhangers, intense emotions.",
+      "CEO Romance":
+        "Write an enemies-to-lovers or forced-proximity romance between an arrogant billionaire CEO and a strong-willed heroine. Include corporate power dynamics, lavish settings, jealousy, misunderstandings, and irresistible chemistry. Style: Brazilian Dreame/99Novels popular romance — addictive chapter hooks, banter, steamy tension, emotional declarations.",
+      "Dark Romance":
+        "Write a dark, morally complex romance that explores obsession, captivity, anti-hero love interests, and twisted devotion. The relationship begins with conflict and darkness but evolves into fierce, consuming love. Include trigger-worthy tension, psychological complexity, and cathartic emotional payoff. Style: Brazilian Dreame dark romance readers — no fade-to-black, raw emotions, villain love interest.",
+      "Suspense Romântico":
+        "Write a romantic suspense where the couple must solve a danger/mystery while falling in love. Include thriller plot twists, a ticking-clock threat, and a slow-burn romance that ignites under pressure. Style: Brazilian Dreame suspense romance — alternating POVs, chapter cliffhangers, danger + desire on every page.",
     };
 
     const systemPrompt = `${activation}
@@ -186,6 +202,14 @@ export async function generateBookCover(
         "clean modern inspirational, bold warm colors, minimalist visual metaphor, professional uplifting",
       Contos:
         "illustrated storybook style, whimsical, rich textures, warm colors, literary artistic aesthetic",
+      "Romance de Mafia":
+        "Brazilian Dreame romance cover style: brooding dark-haired mafia boss in expensive suit, dramatic chiaroscuro lighting, deep red and black palette, rose petals, gun or rose as symbol, cinematic atmosphere, intense magnetic gaze, luxury and danger combined, moody editorial photography style",
+      "CEO Romance":
+        "Brazilian Dreame CEO romance cover style: tall attractive billionaire in tailored suit, city skyline at night or luxury penthouse, gold and navy palette, confident powerful stance, beautiful heroine in elegant dress, glamorous aspirational aesthetic, high-fashion editorial photography feel, warm bokeh city lights",
+      "Dark Romance":
+        "Brazilian Dreame dark romance cover style: dramatic contrast between light and shadow, anti-hero with intense dangerous eyes, dark floral motifs — black roses, ravens, chains as ornamental elements, deep crimson and obsidian palette, gothic elegant aesthetic, tension and forbidden desire atmosphere, cinematic dark fantasy photography style",
+      "Suspense Romântico":
+        "Brazilian Dreame romantic suspense cover style: couple in dangerous situation, thriller atmosphere with romantic tension, muted teal and burgundy palette, motion blur or dramatic silhouettes, urban noir setting, rain-slicked streets or shadowy corridor, sense of urgency and hidden desire, cinematic thriller poster aesthetic",
     };
     const style = genreStyle[genre] ?? "professional book cover, cinematic dramatic lighting";
     const prompt = `Professional publishing-quality book cover for "${title}" by ${author}. Subtitle: "${subtitle}". Style: ${style}. Portrait orientation. Large clear space at top for title text, bottom for author name. No text, no letters, no words anywhere in the image. High quality digital art.`;
