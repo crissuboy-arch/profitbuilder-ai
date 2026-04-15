@@ -105,20 +105,25 @@ export default function BookGeneratorPage() {
     if (!result) return;
     setSaveLoading(true);
     toast.loading("Salvando no projeto...", { id: "save-book" });
-    const { success, message, error } = await saveBookToProject(result, `${result.title.substring(0, 40)} — Livro`);
-    if (success) {
-      toast.success(message, { id: "save-book" });
-    } else {
-      toast.error(error, { id: "save-book" });
+    try {
+      const { success, message, error } = await saveBookToProject(result, `${result.title.substring(0, 40)} — Livro`);
+      if (success) {
+        toast.success(message ?? "Salvo com sucesso!", { id: "save-book" });
+      } else {
+        toast.error(error ?? "Falha ao salvar.", { id: "save-book" });
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Falha ao salvar.", { id: "save-book" });
+    } finally {
+      setSaveLoading(false);
     }
-    setSaveLoading(false);
   }
 
   async function handleDownloadPDF() {
     if (!result) return;
     setPdfLoading(true);
     try {
-      const { jsPDF } = await import("jspdf");
+      const { jsPDF, GState } = await import("jspdf");
       const doc = new jsPDF("p", "mm", "a4");
       const W = doc.internal.pageSize.getWidth();
       const H = doc.internal.pageSize.getHeight();
@@ -224,15 +229,17 @@ export default function BookGeneratorPage() {
           doc.addImage(base64, "PNG", 0, 0, W, H);
           // Overlay gradient strip at bottom for title
           sf(DARK);
-          doc.setGlobalAlpha(0.65);
+          doc.saveGraphicsState();
+          doc.setGState(new GState({ opacity: 0.65 }));
           doc.rect(0, H * 0.58, W, H * 0.42, "F");
-          doc.setGlobalAlpha(1);
+          doc.restoreGraphicsState();
 
           doc.setFont("helvetica", "normal");
           doc.setFontSize(8); st(WHITE);
-          doc.setGlobalAlpha(0.8);
+          doc.saveGraphicsState();
+          doc.setGState(new GState({ opacity: 0.8 }));
           doc.text(genre.toUpperCase(), mg, H * 0.64);
-          doc.setGlobalAlpha(1);
+          doc.restoreGraphicsState();
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(28); st(WHITE);
@@ -242,9 +249,10 @@ export default function BookGeneratorPage() {
 
           doc.setFont("helvetica", "normal");
           doc.setFontSize(9); st(WHITE);
-          doc.setGlobalAlpha(0.7);
+          doc.saveGraphicsState();
+          doc.setGState(new GState({ opacity: 0.7 }));
           doc.text(language, mg, ty + 4);
-          doc.setGlobalAlpha(1);
+          doc.restoreGraphicsState();
         } catch {
           // Fallback to solid cover if image fails
           renderSolidCover();
@@ -270,9 +278,10 @@ export default function BookGeneratorPage() {
 
         doc.setFont("helvetica", "normal");
         doc.setFontSize(11); st(WHITE);
-        doc.setGlobalAlpha(0.8);
+        doc.saveGraphicsState();
+        doc.setGState(new GState({ opacity: 0.8 }));
         doc.text(language, mg, ty + 6);
-        doc.setGlobalAlpha(1);
+        doc.restoreGraphicsState();
 
         doc.setFontSize(10); st(DARK);
         const synLines = doc.splitTextToSize(result!.synopsis, cw - 10);
@@ -319,9 +328,10 @@ export default function BookGeneratorPage() {
         doc.rect(0, 0, W, 42, "F");
 
         doc.setFont("helvetica", "normal"); doc.setFontSize(8); st(WHITE);
-        doc.setGlobalAlpha(0.7);
+        doc.saveGraphicsState();
+        doc.setGState(new GState({ opacity: 0.7 }));
         doc.text(`Capítulo ${i + 1}`, mg, 16);
-        doc.setGlobalAlpha(1);
+        doc.restoreGraphicsState();
 
         doc.setFont("helvetica", "bold"); doc.setFontSize(18); st(WHITE);
         const chTitleLines = doc.splitTextToSize(ch.title.replace(/^Capítulo \d+[:\s]*/i, ""), cw);
