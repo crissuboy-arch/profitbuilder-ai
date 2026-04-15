@@ -4,9 +4,10 @@ import { useState } from "react";
 import {
   generateBook,
   generateBookCover,
-  getImageAsBase64,
+  generateChapterImage,
   saveBookToProject,
   type BookResult,
+  type BookBlock,
 } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,15 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  BookOpen,
-  Loader2,
-  CheckCircle2,
-  Save,
-  FileDown,
-  ChevronDown,
-  ChevronUp,
-  Image as ImageIcon,
-  RefreshCw,
+  BookOpen, Loader2, CheckCircle2, Save, FileDown, ChevronDown, ChevronUp, Image as ImageIcon,
 } from "lucide-react";
 
 const LANGUAGE_OPTIONS = [
@@ -41,77 +34,97 @@ const GENRE_OPTIONS = [
   { value: "Contos", label: "Contos" },
 ];
 
-const GENRE_COLORS: Record<string, { bg: string; text: string; border: string; badge: string }> = {
-  Romance:   { bg: "bg-rose-50",    text: "text-rose-700",    border: "border-rose-200",   badge: "bg-rose-100 text-rose-700" },
-  Thriller:  { bg: "bg-slate-50",   text: "text-slate-700",   border: "border-slate-200",  badge: "bg-slate-200 text-slate-800" },
-  Fantasia:  { bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200", badge: "bg-violet-100 text-violet-700" },
-  Autoajuda: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",  badge: "bg-amber-100 text-amber-700" },
-  Contos:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700" },
+const GENRE_COLORS: Record<string, { bg: string; text: string; badge: string }> = {
+  Romance:   { bg: "bg-rose-50",    text: "text-rose-700",    badge: "bg-rose-100 text-rose-700" },
+  Thriller:  { bg: "bg-slate-50",   text: "text-slate-700",   badge: "bg-slate-200 text-slate-800" },
+  Fantasia:  { bg: "bg-violet-50",  text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
+  Autoajuda: { bg: "bg-amber-50",   text: "text-amber-700",   badge: "bg-amber-100 text-amber-700" },
+  Contos:    { bg: "bg-emerald-50", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
 };
 
 export default function BookGeneratorPage() {
-  const [language, setLanguage] = useState("Português");
-  const [genre, setGenre] = useState("Romance");
-  const [theme, setTheme] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<BookResult | null>(null);
+  const [language, setLanguage]       = useState("Português");
+  const [genre, setGenre]             = useState("Autoajuda");
+  const [theme, setTheme]             = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [result, setResult]           = useState<BookResult | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfLoading, setPdfLoading]   = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  const [coverLoading, setCoverLoading] = useState(false);
 
-  const colors = GENRE_COLORS[genre] ?? GENRE_COLORS["Romance"];
+  // Images
+  const [coverBase64, setCoverBase64] = useState<string | null>(null);
+  const [chapterImages, setChapterImages] = useState<Record<number, string>>({});
+  const [imgStep, setImgStep]         = useState<string>("");
+  const [imgDone, setImgDone]         = useState(0);
+  const [imgTotal, setImgTotal]       = useState(0);
+  const generatingImages              = imgDone < imgTotal && imgTotal > 0;
+
+  const colors = GENRE_COLORS[genre] ?? GENRE_COLORS["Autoajuda"];
+
+  // ── Generate everything ───────────────────────────────────────────────────
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!theme.trim()) {
-      toast.error("Informe o tema do livro.");
-      return;
-    }
+    if (!theme.trim()) { toast.error("Informe o tema do livro."); return; }
+
     setLoading(true);
     setResult(null);
-    setCoverUrl(null);
+    setCoverBase64(null);
+    setChapterImages({});
+    setImgDone(0);
+    setImgTotal(0);
     setExpandedChapter(null);
 
     const { success, data, error } = await generateBook({ language, genre, theme });
 
-    if (success && data) {
-      setResult(data);
-      toast.success("Manuscrito gerado com sucesso!");
-      // Auto-generate cover after book is ready
-      fetchCover(data.title, genre, data.synopsis);
-    } else {
+    if (!success || !data) {
       toast.error(error || "Falha ao gerar o livro.");
+      setLoading(false);
+      return;
     }
 
+    setResult(data);
     setLoading(false);
+    toast.success("Manuscrito gerado! Gerando imagens...");
+
+    // Generate cover + chapter images sequentially with progress
+    const total = 1 + data.chapters.length;
+    setImgTotal(total);
+
+    // Cover
+    setImgStep("Gerando capa...");
+    const coverRes = await generateBookCover(data.title, data.subtitle, data.author, genre);
+    if (coverRes.success && coverRes.base64) setCoverBase64(coverRes.base64);
+    setImgDone(1);
+
+    // Chapter images
+    for (const ch of data.chapters) {
+      setImgStep(`Gerando imagem — Capítulo ${ch.number}/${data.chapters.length}...`);
+      const imgRes = await generateChapterImage(ch.number, ch.title, ch.imageDesc, genre);
+      if (imgRes.success && imgRes.base64) {
+        setChapterImages(prev => ({ ...prev, [ch.number]: imgRes.base64! }));
+      }
+      setImgDone(prev => prev + 1);
+    }
+
+    setImgStep("");
+    toast.success("Livro e imagens prontos! Baixe o PDF.");
   }
 
-  async function fetchCover(title: string, bookGenre: string, synopsis: string) {
-    setCoverLoading(true);
-    toast.loading("Gerando capa com DALL-E...", { id: "cover-gen" });
-    const { success, url, error } = await generateBookCover(title, bookGenre, synopsis);
-    if (success && url) {
-      setCoverUrl(url);
-      toast.success("Capa gerada!", { id: "cover-gen" });
-    } else {
-      toast.error(error || "Falha ao gerar a capa.", { id: "cover-gen" });
-    }
-    setCoverLoading(false);
-  }
+  // ── Save ──────────────────────────────────────────────────────────────────
 
   async function handleSave() {
     if (!result) return;
     setSaveLoading(true);
     toast.loading("Salvando no projeto...", { id: "save-book" });
     try {
-      const { success, message, error } = await saveBookToProject(result, `${result.title.substring(0, 40)} — Livro`);
-      if (success) {
-        toast.success(message ?? "Salvo com sucesso!", { id: "save-book" });
-      } else {
-        toast.error(error ?? "Falha ao salvar.", { id: "save-book" });
-      }
+      const { success, message, error } = await saveBookToProject(
+        result,
+        `${result.title.substring(0, 40)} — Livro`
+      );
+      if (success) toast.success(message ?? "Salvo!", { id: "save-book" });
+      else toast.error(error ?? "Falha ao salvar.", { id: "save-book" });
     } catch (err: any) {
       toast.error(err?.message ?? "Falha ao salvar.", { id: "save-book" });
     } finally {
@@ -119,488 +132,464 @@ export default function BookGeneratorPage() {
     }
   }
 
+  // ── PDF generation — matching book-factory specs exactly ─────────────────
+
   async function handleDownloadPDF() {
     if (!result) return;
     setPdfLoading(true);
     try {
       const { jsPDF, GState } = await import("jspdf");
-      const doc = new jsPDF("p", "mm", "a4");
-      const W = doc.internal.pageSize.getWidth();
-      const H = doc.internal.pageSize.getHeight();
-      const mg = 18;
-      const cw = W - 2 * mg;
 
-      const genreColor: Record<string, [number, number, number]> = {
-        Romance:   [220, 38, 38],
-        Thriller:  [30, 41, 59],
-        Fantasia:  [109, 40, 217],
-        Autoajuda: [180, 83, 9],
-        Contos:    [4, 120, 87],
+      // B5 format — 148×210mm (same as book-factory)
+      const doc = new jsPDF("p", "mm", [148, 210]);
+      const PW = 148;
+      const PH = 210;
+      const ML = 18; // left margin
+      const MT = 18; // top margin
+      const MR = 18; // right margin
+      const W  = PW - ML - MR; // content width = 112mm
+      const NAVY: [number,number,number] = [30, 30, 100];
+      const GRAY: [number,number,number] = [150, 150, 150];
+      const WHITE: [number,number,number] = [255, 255, 255];
+      const DARK: [number,number,number]  = [20, 20, 60];
+
+      let pageNum = 1;
+
+      const setColor = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
+      const resetColor = () => setColor(0, 0, 0);
+
+      // Header — shown on all pages except cover
+      const drawHeader = () => {
+        if (pageNum === 1) return;
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(7);
+        setColor(...GRAY);
+        doc.text(`${result!.title}  |  ${result!.author}`, PW / 2, 10, { align: "center" });
+        resetColor();
       };
-      const ACCENT: [number, number, number] = genreColor[genre] ?? [30, 64, 175];
-      const WHITE: [number, number, number] = [255, 255, 255];
-      const DARK: [number, number, number] = [15, 23, 42];
-      const GRAY: [number, number, number] = [248, 250, 252];
 
-      let pn = 1;
-      const bookTitle = result.title;
-
-      const sf = (c: [number, number, number]) => doc.setFillColor(c[0], c[1], c[2]);
-      const st = (c: [number, number, number]) => doc.setTextColor(c[0], c[1], c[2]);
-      const sd = (c: [number, number, number]) => doc.setDrawColor(c[0], c[1], c[2]);
-
-      const footer = () => {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7.5);
-        doc.setTextColor(190, 190, 190);
-        doc.text(String(pn++), W / 2, H - 7, { align: "center" });
-        doc.setTextColor(210, 210, 210);
-        const tl = doc.splitTextToSize(bookTitle, cw - 30);
-        doc.text(tl[0], W / 2, H - 12.5, { align: "center" });
+      // Footer — page number
+      const drawFooter = () => {
+        if (pageNum === 1) return;
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        setColor(...GRAY);
+        doc.text(String(pageNum), PW / 2, PH - 6, { align: "center" });
+        resetColor();
       };
 
       const newPage = () => {
+        drawFooter();
         doc.addPage();
-        sf(GRAY);
-        doc.rect(0, 0, W, H, "F");
+        pageNum++;
+        drawHeader();
       };
 
-      const wrap = (text: string, x: number, y: number, maxW: number, lh = 6.2): number => {
+      // Wrapping text — returns new Y position
+      // auto page-break if near bottom
+      const writeLines = (
+        text: string,
+        x: number,
+        y: number,
+        maxW: number,
+        lineH: number,
+        align: "left" | "center" = "left"
+      ): number => {
         const lines = doc.splitTextToSize(text, maxW);
         for (const ln of lines) {
-          if (y > H - 28) { footer(); newPage(); y = 28; }
-          doc.text(ln, x, y);
-          y += lh;
+          if (y > PH - 22) { newPage(); y = MT + 10; }
+          doc.text(ln, align === "center" ? x + maxW / 2 : x, y, {
+            align: align === "center" ? "center" : "left",
+          });
+          y += lineH;
         }
         return y;
       };
 
-      const isSubt = (s: string) => s.length < 68 && s.length > 4 && !/[.!?,;]$/.test(s) && !s.includes("\n");
-      const isBullet = (s: string) => /^[-•*✓→▶]\s/.test(s.trim()) || /^\d+[.)]\s/.test(s.trim());
-
-      const renderContent = (content: string, startY: number): number => {
-        const blocks = content.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
-        let y = startY;
-        let first = true;
-
-        for (const block of blocks) {
-          if (y > H - 40) { footer(); newPage(); y = 28; }
-          const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
-
-          const bulletLines = lines.filter(isBullet);
-          if (bulletLines.length >= 2) {
-            for (const bl of bulletLines) {
-              if (y > H - 28) { footer(); newPage(); y = 28; }
-              const txt = bl.replace(/^[-•*✓→▶]\s*|\d+[.)]\s*/, "");
-              sf(ACCENT); doc.circle(mg + 2, y - 2, 1.6, "F");
-              doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(40, 40, 40);
-              y = wrap(txt, mg + 7, y, cw - 7, 5.8);
-              y += 1.5;
-            }
-            y += 3; first = false; continue;
-          }
-
-          if (lines.length === 1 && isSubt(block)) {
-            y += 4;
-            doc.setFont("helvetica", "bold"); doc.setFontSize(13); st(ACCENT);
-            doc.text(block, mg, y);
-            y += 4; sd(ACCENT); doc.setLineWidth(0.5); doc.line(mg, y, mg + 32, y);
-            y += 7; first = false; continue;
-          }
-
-          if (first) {
-            doc.setFont("helvetica", "normal"); doc.setFontSize(11.5); st(DARK);
-            y = wrap(block, mg, y, cw, 7);
-            y += 6; first = false; continue;
-          }
-
-          doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(55, 55, 55);
-          y = wrap(block, mg, y, cw, 6.2);
-          y += 5;
-        }
-        return y;
-      };
-
-      // ── COVER PAGE ──
-      if (coverUrl) {
-        // Embed DALL-E cover image
-        try {
-          const base64 = await getImageAsBase64(coverUrl);
-          doc.addImage(base64, "PNG", 0, 0, W, H);
-          // Overlay gradient strip at bottom for title
-          sf(DARK);
-          doc.saveGraphicsState();
-          doc.setGState(new GState({ opacity: 0.65 }));
-          doc.rect(0, H * 0.58, W, H * 0.42, "F");
-          doc.restoreGraphicsState();
-
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(8); st(WHITE);
-          doc.saveGraphicsState();
-          doc.setGState(new GState({ opacity: 0.8 }));
-          doc.text(genre.toUpperCase(), mg, H * 0.64);
-          doc.restoreGraphicsState();
-
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(28); st(WHITE);
-          const titleLines = doc.splitTextToSize(result.title, cw);
-          let ty = H * 0.70;
-          for (const tl of titleLines) { doc.text(tl, mg, ty); ty += 12; }
-
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9); st(WHITE);
-          doc.saveGraphicsState();
-          doc.setGState(new GState({ opacity: 0.7 }));
-          doc.text(language, mg, ty + 4);
-          doc.restoreGraphicsState();
-        } catch {
-          // Fallback to solid cover if image fails
-          renderSolidCover();
-        }
+      // ── COVER PAGE ───────────────────────────────────────────────────────
+      if (coverBase64) {
+        doc.addImage(coverBase64, "PNG", 0, 0, PW, PH);
+        // Dark overlay at bottom for text readability
+        doc.saveGraphicsState();
+        doc.setGState(new GState({ opacity: 0.55 }));
+        doc.setFillColor(10, 10, 40);
+        doc.rect(0, PH * 0.55, PW, PH * 0.45, "F");
+        doc.restoreGraphicsState();
+        setColor(...WHITE);
       } else {
-        renderSolidCover();
+        // Solid cover fallback
+        doc.setFillColor(...DARK);
+        doc.rect(0, 0, PW, PH, "F");
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, PH * 0.6, PW, PH * 0.4, "F");
+        setColor(...WHITE);
       }
 
-      function renderSolidCover() {
-        sf(ACCENT);
-        doc.rect(0, 0, W, H, "F");
-        sf(WHITE);
-        doc.rect(0, H * 0.62, W, H * 0.38, "F");
+      // Cover title (top area)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      setColor(...WHITE);
+      let y = 26;
+      const titleLines = doc.splitTextToSize(result.title, W);
+      for (const tl of titleLines) {
+        doc.text(tl, PW / 2, y, { align: "center" });
+        y += 12;
+      }
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9); st(WHITE);
-        doc.text(genre.toUpperCase(), mg, 30);
-
-        doc.setFontSize(34); st(WHITE);
-        const titleLines = doc.splitTextToSize(result!.title, cw);
-        let ty = 55;
-        for (const tl of titleLines) { doc.text(tl, mg, ty); ty += 14; }
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(11); st(WHITE);
-        doc.saveGraphicsState();
-        doc.setGState(new GState({ opacity: 0.8 }));
-        doc.text(language, mg, ty + 6);
-        doc.restoreGraphicsState();
-
-        doc.setFontSize(10); st(DARK);
-        const synLines = doc.splitTextToSize(result!.synopsis, cw - 10);
-        let sy = H * 0.68;
-        for (const sl of synLines.slice(0, 12)) {
-          if (sy > H - 25) break;
-          doc.text(sl, mg, sy);
-          sy += 5.5;
+      // Cover subtitle
+      if (result.subtitle) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(11);
+        setColor(...WHITE);
+        const subLines = doc.splitTextToSize(result.subtitle.split(".")[0], W);
+        for (const sl of subLines) {
+          doc.text(sl, PW / 2, y, { align: "center" });
+          y += 7;
         }
       }
 
-      // ── TABLE OF CONTENTS ──
-      newPage();
-      doc.setFont("helvetica", "bold"); doc.setFontSize(20); st(ACCENT);
-      doc.text("Sumário", mg, 30);
-      sd(ACCENT); doc.setLineWidth(1); doc.line(mg, 34, mg + 40, 34);
+      // Author at bottom
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      setColor(...WHITE);
+      doc.text(result.author, PW / 2, PH - 18, { align: "center" });
+      resetColor();
 
-      let tocY = 46;
-      result.chapters.forEach((ch, i) => {
-        if (tocY > H - 20) { footer(); newPage(); tocY = 28; }
-        doc.setFont("helvetica", "normal"); doc.setFontSize(11); st(DARK);
-        doc.text(`${i + 1}.  ${ch.title}`, mg, tocY);
-        tocY += 8;
-      });
-      footer();
-
-      // ── SYNOPSIS PAGE ──
-      newPage();
-      doc.setFont("helvetica", "bold"); doc.setFontSize(18); st(ACCENT);
-      doc.text("Sinopse", mg, 30);
-      sd(ACCENT); doc.setLineWidth(0.8); doc.line(mg, 34, mg + 28, 34);
-
-      doc.setFont("helvetica", "normal"); doc.setFontSize(11); st(DARK);
-      let synY = 44;
-      synY = wrap(result.synopsis, mg, synY, cw, 7);
-      footer();
-
-      // ── CHAPTERS ──
-      for (let i = 0; i < result.chapters.length; i++) {
-        const ch = result.chapters[i];
+      // ── CHAPTER PAGES ────────────────────────────────────────────────────
+      for (const ch of result.chapters) {
         newPage();
+        let cy = MT + 8; // start below header
 
-        sf(ACCENT);
-        doc.rect(0, 0, W, 42, "F");
+        // Chapter number
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        setColor(...NAVY);
+        doc.text(`Capítulo ${ch.number}`, PW / 2, cy, { align: "center" });
+        cy += 8;
 
-        doc.setFont("helvetica", "normal"); doc.setFontSize(8); st(WHITE);
-        doc.saveGraphicsState();
-        doc.setGState(new GState({ opacity: 0.7 }));
-        doc.text(`Capítulo ${i + 1}`, mg, 16);
-        doc.restoreGraphicsState();
-
-        doc.setFont("helvetica", "bold"); doc.setFontSize(18); st(WHITE);
-        const chTitleLines = doc.splitTextToSize(ch.title.replace(/^Capítulo \d+[:\s]*/i, ""), cw);
-        let chTY = 30;
-        for (const tl of chTitleLines) {
-          doc.text(tl, mg, chTY); chTY += 9;
+        // Chapter title
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        const chTLines = doc.splitTextToSize(ch.title, W);
+        for (const tl of chTLines) {
+          doc.text(tl, PW / 2, cy, { align: "center" });
+          cy += 7;
         }
 
-        let y = 56;
-        renderContent(ch.content, y);
-        footer();
+        // Decorative line (navy, 0.4pt, centered 50% width)
+        cy += 3;
+        const lineStart = ML + W * 0.25;
+        doc.setDrawColor(...NAVY);
+        doc.setLineWidth(0.4);
+        doc.line(lineStart, cy, lineStart + W * 0.5, cy);
+        cy += 6;
+
+        // Chapter illustration
+        const chImg = chapterImages[ch.number];
+        if (chImg) {
+          // landscape 1792×1024 → aspect ratio 1024/1792 ≈ 0.5714
+          const imgH = W * (1024 / 1792);
+          if (cy + imgH > PH - 22) { newPage(); cy = MT + 10; }
+          doc.addImage(chImg, "PNG", ML, cy, W, imgH);
+          cy += imgH + 6;
+        }
+
+        resetColor();
+
+        // Content blocks
+        for (const block of ch.blocks) {
+          if (cy > PH - 22) { newPage(); cy = MT + 10; }
+
+          if (block.type === "heading") {
+            cy += 3;
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            setColor(...NAVY);
+            cy = writeLines(block.text.toUpperCase(), ML, cy, W, 6);
+            resetColor();
+            cy += 1;
+
+          } else if (block.type === "bullet") {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            resetColor();
+            cy = writeLines(`\u2022  ${block.text}`, ML + 5, cy, W - 5, 5.5);
+            cy += 0.5;
+
+          } else {
+            // paragraph
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(10);
+            resetColor();
+            cy = writeLines(block.text, ML, cy, W, 5.8);
+            cy += 2.5;
+          }
+        }
       }
 
-      doc.save(`${result.title.substring(0, 50)}.pdf`);
+      // Draw final page footer
+      drawFooter();
+
+      const filename = result.title.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_").substring(0, 50);
+      doc.save(`${filename}.pdf`);
       toast.success("PDF baixado com sucesso!");
     } catch (err) {
-      console.error(err);
+      console.error("PDF error:", err);
       toast.error("Falha ao gerar o PDF.");
     }
     setPdfLoading(false);
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const renderBlocks = (blocks: BookBlock[]) => (
+    <div className="space-y-2 text-sm text-slate-700">
+      {blocks.map((b, i) => {
+        if (b.type === "heading") return (
+          <p key={i} className="font-bold text-xs uppercase tracking-wider text-slate-500 pt-3 pb-1">
+            {b.text}
+          </p>
+        );
+        if (b.type === "bullet") return (
+          <p key={i} className="pl-4 leading-relaxed">• {b.text}</p>
+        );
+        return <p key={i} className="leading-relaxed">{b.text}</p>;
+      })}
+    </div>
+  );
+
+  const imagesReady = imgTotal > 0 && imgDone >= imgTotal;
+  const imageCount  = Object.keys(chapterImages).length;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto font-[family-name:var(--font-geist-sans)]">
-      {/* Page Header */}
+    <div className="p-8 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <div className="p-3 bg-indigo-600/10 rounded-xl">
           <BookOpen className="w-8 h-8 text-indigo-600" />
         </div>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gerador de Livros</h1>
-          <p className="text-muted-foreground">
-            Crie um manuscrito completo com Story Chief + squad Storytelling. Capa gerada por DALL-E.
+          <p className="text-muted-foreground text-sm">
+            Story Chief + DALL-E 3 por capítulo · PDF profissional B5 com capa e ilustrações
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
 
-        {/* Left Column — Input Form */}
+        {/* Form */}
         <Card className="xl:col-span-4 h-fit sticky top-24 border-none shadow-md">
           <CardHeader>
-            <CardTitle>Configurações do Livro</CardTitle>
-            <CardDescription>Defina o idioma, gênero e tema para gerar seu manuscrito.</CardDescription>
+            <CardTitle>Configurações</CardTitle>
+            <CardDescription>Idioma, gênero e tema do livro.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-5">
-
               <div className="space-y-2">
                 <Label>Idioma</Label>
                 <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o idioma" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {LANGUAGE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
+                    {LANGUAGE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Gênero Literário</Label>
                 <Select value={genre} onValueChange={setGenre}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o gênero" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {GENRE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
+                    {GENRE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="theme">Tema do Livro</Label>
                 <Input
                   id="theme"
-                  placeholder="Ex: Uma jovem que descobre ter poderes mágicos..."
+                  placeholder="Ex: Como construir relações saudáveis..."
                   value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
+                  onChange={e => setTheme(e.target.value)}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Descreva o tema, premissa ou ideia central do livro.
-                </p>
               </div>
-
               <Button
                 type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg mt-2"
-                disabled={loading}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+                disabled={loading || generatingImages}
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Escrevendo manuscrito...
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Escrevendo manuscrito...</>
+                ) : generatingImages ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Gerando imagens...</>
                 ) : (
-                  <>
-                    <BookOpen className="mr-2 h-4 w-4" />
-                    Gerar Livro
-                  </>
+                  <><BookOpen className="mr-2 h-4 w-4" />Gerar Livro Completo</>
                 )}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Right Column — Results */}
+        {/* Results */}
         <div className="xl:col-span-8 flex flex-col gap-6">
 
+          {/* Empty state */}
           {!result && !loading && (
             <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-slate-50/50">
-              <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                <BookOpen className="w-8 h-8 text-slate-400" />
-              </div>
-              <h3 className="text-xl font-medium text-slate-700">Aguardando configurações</h3>
-              <p className="text-slate-500 max-w-sm text-center mt-2 text-sm">
-                Configure o idioma, gênero e tema do livro e clique em &quot;Gerar Livro&quot;.
+              <BookOpen className="w-10 h-10 text-slate-300 mb-3" />
+              <h3 className="text-lg font-medium text-slate-600">Aguardando configurações</h3>
+              <p className="text-slate-400 text-sm mt-1 text-center max-w-xs">
+                Preencha o tema e clique em &quot;Gerar Livro Completo&quot;
               </p>
             </div>
           )}
 
+          {/* Loading state */}
           {loading && (
             <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-indigo-50/30">
               <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-              <h3 className="text-xl font-medium text-slate-700 animate-pulse">Escrevendo seu manuscrito...</h3>
-              <p className="text-slate-500 text-sm mt-2">Story Chief + squad Storytelling em ação.</p>
+              <h3 className="text-lg font-medium text-slate-700 animate-pulse">Escrevendo manuscrito...</h3>
+              <p className="text-slate-400 text-sm mt-1">Story Chief + squad Storytelling em ação</p>
             </div>
           )}
 
           {result && !loading && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
+              {/* Image generation progress */}
+              {imgTotal > 0 && imgDone < imgTotal && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Loader2 className="w-4 h-4 text-indigo-600 animate-spin shrink-0" />
+                    <span className="text-sm font-medium text-indigo-700">{imgStep}</span>
+                  </div>
+                  <div className="w-full bg-indigo-100 rounded-full h-1.5">
+                    <div
+                      className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500"
+                      style={{ width: `${(imgDone / imgTotal) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-indigo-500 mt-1">{imgDone}/{imgTotal} imagens geradas</p>
+                </div>
+              )}
+
               {/* Action bar */}
               <div className="flex flex-wrap justify-between items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                <div className="flex items-center gap-2 text-indigo-600 font-medium tracking-tight">
-                  <CheckCircle2 className="w-5 h-5" />
+                <div className="flex items-center gap-2 text-indigo-600 font-medium text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
                   Manuscrito gerado
+                  {imageCount > 0 && (
+                    <span className="text-xs text-slate-400 font-normal">
+                      · {imageCount}/{result.chapters.length} ilustrações
+                      {coverBase64 ? " + capa" : ""}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className={`text-xs px-2 py-1 rounded-md border ${colors.badge} border-transparent`}>
-                    {genre}
-                  </span>
-                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
-                    {language}
-                  </span>
-                  <Button
-                    onClick={handleSave}
-                    disabled={saveLoading}
-                    variant="outline"
-                    className="border-slate-200 text-slate-700 hover:bg-slate-50"
-                  >
-                    {saveLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs px-2 py-1 rounded-md ${colors.badge}`}>{genre}</span>
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md">{language}</span>
+                  <Button onClick={handleSave} disabled={saveLoading} variant="outline" size="sm">
+                    {saveLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
                     Salvar
                   </Button>
                   <Button
                     onClick={handleDownloadPDF}
-                    disabled={pdfLoading}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
+                    disabled={pdfLoading || generatingImages}
+                    size="sm"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {pdfLoading ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Gerando PDF...</>
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Gerando PDF...</>
+                    ) : generatingImages ? (
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Aguardando imagens...</>
                     ) : (
-                      <><FileDown className="w-4 h-4 mr-2" />Baixar PDF</>
+                      <><FileDown className="w-3.5 h-3.5 mr-1.5" />Baixar PDF</>
                     )}
                   </Button>
                 </div>
               </div>
 
-              {/* Cover Image */}
-              <div className="flex gap-6">
-                <div className="shrink-0 w-36">
-                  {coverLoading ? (
-                    <div className="w-36 h-52 rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-2 border border-slate-200">
-                      <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
-                      <span className="text-xs text-slate-400">DALL-E...</span>
-                    </div>
-                  ) : coverUrl ? (
-                    <div className="relative group">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={coverUrl}
-                        alt="Capa do livro"
-                        className="w-36 h-52 object-cover rounded-xl shadow-lg border border-slate-200"
-                      />
-                      <button
-                        onClick={() => fetchCover(result.title, genre, result.synopsis)}
-                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition rounded-xl flex items-center justify-center gap-1 text-white text-xs font-medium"
-                      >
-                        <RefreshCw className="w-4 h-4" /> Gerar nova
-                      </button>
-                    </div>
+              {/* Cover + Title */}
+              <div className="flex gap-5">
+                <div className="shrink-0 w-32">
+                  {coverBase64 ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={coverBase64} alt="Capa" className="w-32 h-48 object-cover rounded-lg shadow-md border border-slate-200" />
                   ) : (
-                    <button
-                      onClick={() => fetchCover(result.title, genre, result.synopsis)}
-                      className="w-36 h-52 rounded-xl bg-slate-100 hover:bg-slate-200 transition flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 text-slate-500"
-                    >
-                      <ImageIcon className="w-6 h-6" />
-                      <span className="text-xs text-center px-2">Gerar capa com DALL-E</span>
-                    </button>
+                    <div className="w-32 h-48 rounded-lg bg-slate-100 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-1 text-slate-400">
+                      <ImageIcon className="w-5 h-5" />
+                      <span className="text-xs text-center">capa DALL-E</span>
+                    </div>
                   )}
                 </div>
-
-                {/* Title card */}
-                <Card className={`flex-1 border-none shadow-md overflow-hidden ${colors.bg}`}>
-                  <CardContent className="pt-6 pb-6 h-full flex flex-col justify-center">
-                    <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${colors.text}`}>{genre}</p>
-                    <h2 className={`text-3xl font-black tracking-tight ${colors.text}`}>{result.title}</h2>
-                    {coverUrl && (
-                      <p className="text-xs mt-3 text-slate-400 flex items-center gap-1">
-                        <ImageIcon className="w-3 h-3" /> Capa gerada por DALL-E 3 — incluída no PDF
-                      </p>
+                <Card className={`flex-1 border-none shadow-md ${colors.bg}`}>
+                  <CardContent className="pt-5 pb-5">
+                    <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${colors.text}`}>{genre}</p>
+                    <h2 className={`text-2xl font-black tracking-tight ${colors.text}`}>{result.title}</h2>
+                    {result.subtitle && (
+                      <p className={`text-sm mt-1 italic ${colors.text} opacity-80`}>{result.subtitle}</p>
                     )}
+                    <p className={`text-xs mt-2 ${colors.text} opacity-60`}>por {result.author}</p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Synopsis */}
-              <Card className="border-none shadow-sm border border-slate-100">
-                <CardHeader className={`pb-3 border-b ${colors.bg}`}>
-                  <CardTitle className={`flex items-center gap-2 text-base ${colors.text}`}>
-                    <BookOpen className="w-4 h-4" />
-                    Sinopse
+              <Card className="border-none shadow-sm">
+                <CardHeader className={`pb-2 border-b ${colors.bg}`}>
+                  <CardTitle className={`flex items-center gap-2 text-sm ${colors.text}`}>
+                    <BookOpen className="w-4 h-4" /> Sinopse
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <p className="text-slate-700 leading-relaxed">{result.synopsis}</p>
+                  <p className="text-slate-700 text-sm leading-relaxed">{result.synopsis}</p>
                 </CardContent>
               </Card>
 
-              {/* Chapters */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-slate-800 text-sm uppercase tracking-wider px-1">
-                  10 Capítulos
+              {/* Chapters accordion */}
+              <div className="space-y-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+                  {result.chapters.length} Capítulos
                 </h3>
-                {result.chapters.map((ch, i) => {
-                  const isOpen = expandedChapter === i;
+                {result.chapters.map((ch) => {
+                  const isOpen = expandedChapter === ch.number;
+                  const hasImg = !!chapterImages[ch.number];
                   return (
-                    <Card key={i} className="border-none shadow-sm border border-slate-100 overflow-hidden">
+                    <Card key={ch.number} className="border-none shadow-sm overflow-hidden">
                       <div
                         role="button"
                         tabIndex={0}
-                        className={`px-6 py-3 flex flex-row items-center justify-between cursor-pointer transition-colors ${isOpen ? colors.bg : "hover:bg-slate-50/80"}`}
-                        onClick={() => setExpandedChapter(isOpen ? null : i)}
-                        onKeyDown={(e) => e.key === "Enter" && setExpandedChapter(isOpen ? null : i)}
+                        className={`px-5 py-3 flex items-center justify-between cursor-pointer transition-colors ${isOpen ? colors.bg : "hover:bg-slate-50"}`}
+                        onClick={() => setExpandedChapter(isOpen ? null : ch.number)}
+                        onKeyDown={e => e.key === "Enter" && setExpandedChapter(isOpen ? null : ch.number)}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${isOpen ? colors.badge : "bg-slate-100 text-slate-500"}`}>
-                            {i + 1}
+                            {ch.number}
                           </span>
-                          <span className={`text-sm font-semibold ${isOpen ? colors.text : "text-slate-700"}`}>
+                          <span className={`text-sm font-medium truncate ${isOpen ? colors.text : "text-slate-700"}`}>
                             {ch.title}
                           </span>
                         </div>
-                        {isOpen ? (
-                          <ChevronUp className={`w-4 h-4 shrink-0 ${colors.text}`} />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />
-                        )}
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          {hasImg && <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />}
+                          {isOpen
+                            ? <ChevronUp className={`w-4 h-4 ${colors.text}`} />
+                            : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        </div>
                       </div>
                       {isOpen && (
-                        <CardContent className="pt-2 pb-5">
-                          <div className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
-                            {ch.content}
-                          </div>
+                        <CardContent className="pt-3 pb-5">
+                          {chapterImages[ch.number] && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={chapterImages[ch.number]}
+                              alt={`Ilustração capítulo ${ch.number}`}
+                              className="w-full rounded-lg mb-4 shadow-sm"
+                            />
+                          )}
+                          {renderBlocks(ch.blocks)}
                         </CardContent>
                       )}
                     </Card>
@@ -608,22 +597,22 @@ export default function BookGeneratorPage() {
                 })}
               </div>
 
-              {/* Bottom download button */}
-              <div className="flex justify-center pt-2 pb-4">
-                <Button
-                  onClick={handleDownloadPDF}
-                  disabled={pdfLoading || coverLoading}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl text-base px-8 py-5 rounded-full font-bold flex items-center gap-2"
-                >
-                  {pdfLoading ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" />Gerando PDF...</>
-                  ) : coverLoading ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" />Aguardando capa...</>
-                  ) : (
-                    <><FileDown className="w-5 h-5" />Baixar Manuscrito em PDF {coverUrl ? "com Capa" : ""}</>
-                  )}
-                </Button>
-              </div>
+              {/* Bottom CTA */}
+              {imagesReady && (
+                <div className="flex justify-center pt-2 pb-4">
+                  <Button
+                    onClick={handleDownloadPDF}
+                    disabled={pdfLoading}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl text-base px-8 py-5 rounded-full font-bold"
+                  >
+                    {pdfLoading
+                      ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Gerando PDF...</>
+                      : <><FileDown className="w-5 h-5 mr-2" />Baixar Manuscrito Completo em PDF</>
+                    }
+                  </Button>
+                </div>
+              )}
+
             </div>
           )}
         </div>

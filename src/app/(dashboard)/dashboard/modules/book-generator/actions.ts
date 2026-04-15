@@ -2,16 +2,27 @@
 
 import fs from "fs";
 import path from "path";
-import { openai, DEFAULT_MODEL, parseOpenAIResponse } from "@/lib/openai";
+import { openai, DEFAULT_MODEL } from "@/lib/openai";
 import { saveGenerationToDatabase } from "@/lib/projects";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type BookBlock = {
+  type: "heading" | "bullet" | "paragraph";
+  text: string;
+};
+
 export type BookChapter = {
+  number: number;
   title: string;
-  content: string;
+  imageDesc: string;
+  blocks: BookBlock[];
 };
 
 export type BookResult = {
   title: string;
+  subtitle: string;
+  author: string;
   synopsis: string;
   chapters: BookChapter[];
 };
@@ -22,28 +33,27 @@ export type GenerateBookParams = {
   theme: string;
 };
 
-// Map each genre to the storytelling specialists story-chief would route to
+// ── Story Chief integration ───────────────────────────────────────────────────
+
 const GENRE_SPECIALISTS: Record<string, string> = {
   Romance:
-    "Kindra Hall (strategic stories with emotional truth, vulnerability, customer connection) and Matthew Dicks (personal narrative, finding the hidden story within ordinary moments).",
+    "Kindra Hall (strategic stories with emotional truth) and Matthew Dicks (personal narrative, vulnerability, finding the hidden story).",
   Thriller:
-    "Blake Snyder (beat sheet, genre conventions, commercial structure, save the cat moments) and Shawn Coyne (story editing, value shifts from positive to negative across scenes, editorial rigor).",
+    "Blake Snyder (beat sheet, commercial structure, save-the-cat moments) and Shawn Coyne (story editing, value shifts, editorial rigor).",
   Fantasia:
-    "Joseph Campbell (hero's journey, mythic archetypes, the call to adventure, threshold crossings) and Dan Harmon (story circle, character transformation through want→need→change).",
+    "Joseph Campbell (hero's journey, mythic archetypes, threshold crossings) and Dan Harmon (story circle, character transformation).",
   Autoajuda:
-    "Park Howell (Brand Story Cycle, ABT framework: And→But→Therefore) and Nancy Duarte (audience as hero, transformation from 'what is' to 'what could be', data narrative).",
+    "Park Howell (Brand Story Cycle, ABT: And→But→Therefore) and Nancy Duarte (audience as hero, transformation narrative).",
   Contos:
-    "Matthew Dicks (finding and crafting personal true stories, the 'homework for life' method) and Keith Johnstone (spontaneity, status games, improv narrative, embracing the unexpected).",
+    "Matthew Dicks (homework for life method, finding stories in ordinary moments) and Keith Johnstone (spontaneity, status, improv narrative).",
 };
 
 function loadStoryChief(): { activation: string; principles: string } {
   try {
     const mdPath = path.join(process.cwd(), "public", "agents", "storytelling", "story-chief.md");
     const content = fs.readFileSync(mdPath, "utf-8");
-
     const activationMatch = content.match(/>\s*ACTIVATION-NOTICE:\s*(.+)/);
     const activation = activationMatch?.[1]?.trim() ?? "";
-
     const principlesBlock = content.match(/core_principles:\n([\s\S]*?)(?:\n\w|\nsignature_vocabulary|$)/);
     const principles = principlesBlock
       ? principlesBlock[1]
@@ -52,12 +62,13 @@ function loadStoryChief(): { activation: string; principles: string } {
           .map((l) => l.replace(/^\s*-\s*"?/, "").replace(/"$/, "").trim())
           .join("\n")
       : "";
-
     return { activation, principles };
   } catch {
     return { activation: "", principles: "" };
   }
 }
+
+// ── Book generation ───────────────────────────────────────────────────────────
 
 export async function generateBook(
   params: GenerateBookParams
@@ -66,63 +77,63 @@ export async function generateBook(
     const { activation, principles } = loadStoryChief();
     const specialist = GENRE_SPECIALISTS[params.genre] ?? "a master narrative craftsman";
 
-    const genreInstructions: Record<string, string> = {
+    const genreGuidance: Record<string, string> = {
       Romance:
-        "Focus on emotional connections, relationships, and personal growth. Include vivid descriptions of feelings, tension, and heartfelt moments.",
+        "Focus on emotional connections, relationships, personal growth. Include vivid descriptions of feelings, tension, and heartfelt moments.",
       Thriller:
         "Build suspense, tension, and unexpected twists. Include fast-paced scenes, cliffhangers, and psychological depth.",
       Fantasia:
         "Create a rich world with unique rules, magical elements, epic quests, and memorable characters. World-building is essential.",
       Autoajuda:
-        "Provide practical advice, real-world examples, and actionable steps. Use an empathetic, motivational tone.",
+        "Provide practical advice, real-world examples, and actionable steps in each chapter. Use an empathetic, motivational tone.",
       Contos:
-        "Write vivid, self-contained short stories within each chapter that share a common theme. Each chapter can be an independent tale.",
+        "Write vivid self-contained stories per chapter sharing a common theme. Each chapter is an independent tale.",
     };
-
-    const genreGuidance = genreInstructions[params.genre] ?? "";
 
     const systemPrompt = `${activation}
 
-As Story Chief, you are routing this book generation to the narrative specialists: ${specialist}
+As Story Chief, routing to specialists: ${specialist}
 
-Apply their combined storytelling frameworks to produce chapters of exceptional narrative quality.
-
-STORY CHIEF CORE PRINCIPLES:
+STORY CHIEF PRINCIPLES:
 ${principles}
 
----
-
 GENRE: ${params.genre}
-GENRE GUIDANCE: ${genreGuidance}
+GUIDANCE: ${genreGuidance[params.genre] ?? ""}
+LANGUAGE: ${params.language}
 
-YOUR TASK: Write a COMPLETE, FULLY WRITTEN book manuscript — not an outline or summary.
-
-CRITICAL REQUIREMENTS:
-1. The "content" field of EACH chapter must contain the ACTUAL FULL WRITTEN TEXT — minimum 800 words of real prose per chapter.
-2. Do NOT write descriptions or outlines. Write the actual content as it would appear in the published book.
-3. Each chapter must have: an opening hook, developed scenes/ideas, internal subtitles, and a closing that connects to the next chapter.
-4. The synopsis must be 150-200 words, compelling and market-ready.
-5. Apply the specialist frameworks above: structure, emotional truth, character arcs, and narrative transformation must be present in every chapter.
-
-Return ONLY a valid JSON object:
+Return ONLY a valid JSON object with EXACTLY this structure:
 {
-  "title": "The compelling book title",
-  "synopsis": "150-200 word market-ready synopsis",
+  "title": "Compelling book title",
+  "subtitle": "One-line descriptive subtitle",
+  "author": "Fictional author name appropriate to the genre and language",
+  "synopsis": "150-200 word compelling synopsis for the back cover",
   "chapters": [
     {
-      "title": "Chapter 1: Evocative Title",
-      "content": "Full 800+ word chapter text with paragraphs, internal subtitles, and rich narrative"
+      "number": 1,
+      "title": "Chapter title without the word Chapter",
+      "imageDesc": "Detailed visual scene for DALL-E 3 illustration. No text. Realistic/painterly style. Max 120 words.",
+      "blocks": [
+        {"type": "heading", "text": "Introdução"},
+        {"type": "paragraph", "text": "Opening hook paragraph — minimum 80 words of actual prose"},
+        {"type": "heading", "text": "Desenvolvimento"},
+        {"type": "bullet", "text": "First key point or example — fully written"},
+        {"type": "bullet", "text": "Second key point or example — fully written"},
+        {"type": "bullet", "text": "Third key point with practical insight"},
+        {"type": "heading", "text": "Conclusão"},
+        {"type": "paragraph", "text": "Closing reflection that connects to the next chapter — minimum 60 words"}
+      ]
     }
   ]
 }
 
 ABSOLUTE RULES:
-1. ALL text MUST be written natively in ${params.language}. Never mix languages.
-2. Genre: ${params.genre} — honor the genre conventions fully.
-3. Include EXACTLY 10 chapters in the chapters array.
-4. Return ONLY the JSON object — no markdown fences, no extra text.`;
+1. ALL text in ${params.language} — never mix languages.
+2. EXACTLY 10 chapters.
+3. Each chapter MUST have blocks in this order: heading(Introdução) → paragraph → heading(Desenvolvimento) → 3+ bullets → heading(Conclusão) → paragraph.
+4. "imageDesc" must be a vivid scene, NO text/letters in the image.
+5. Return ONLY the JSON — no markdown fences, no extra text.`;
 
-    const userPrompt = `Write a complete ${params.genre} book about the following theme: ${params.theme}`;
+    const userPrompt = `Write a complete ${params.genre} book about: ${params.theme}`;
 
     const response = await openai.chat.completions.create({
       model: DEFAULT_MODEL,
@@ -135,7 +146,13 @@ ABSOLUTE RULES:
       max_tokens: 16000,
     });
 
-    const parsed = parseOpenAIResponse<BookResult>(response.choices[0].message.content);
+    const content = response.choices[0].message.content;
+    if (!content) throw new Error("No content received");
+
+    let clean = content.trim();
+    if (clean.startsWith("```")) clean = clean.replace(/^```[a-z]*\n?/, "").replace(/```$/, "").trim();
+
+    const parsed = JSON.parse(clean) as BookResult;
     return { success: true, data: parsed };
   } catch (error: any) {
     console.error("Error generating book:", error);
@@ -143,57 +160,88 @@ ABSOLUTE RULES:
   }
 }
 
+// ── Image generation ──────────────────────────────────────────────────────────
+
+async function fetchAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  const buffer = await response.arrayBuffer();
+  return `data:image/png;base64,${Buffer.from(buffer).toString("base64")}`;
+}
+
 export async function generateBookCover(
   title: string,
-  genre: string,
-  synopsis: string
-): Promise<{ success: boolean; url?: string; error?: string }> {
+  subtitle: string,
+  author: string,
+  genre: string
+): Promise<{ success: boolean; base64?: string; error?: string }> {
   try {
     const genreStyle: Record<string, string> = {
       Romance:
-        "romantic, warm golden tones, soft bokeh, couple silhouettes, elegant typography space, emotional and intimate atmosphere",
+        "romantic, warm golden tones, soft bokeh, elegant intimate atmosphere, couples motif, inspirational",
       Thriller:
-        "dark cinematic, dramatic shadows, high contrast, suspenseful atmosphere, noir aesthetic, urban or isolated setting",
+        "dark cinematic, dramatic shadows, high contrast noir, suspenseful, urban or isolated setting",
       Fantasia:
-        "epic fantasy art, magical landscape, dramatic sky, glowing elements, mythic and otherworldly atmosphere, painterly style",
+        "epic fantasy art, magical landscape, dramatic glowing sky, mythic otherworldly atmosphere, painterly",
       Autoajuda:
-        "clean modern design, inspirational, bold colors, minimalist with motivational visual metaphor, professional and uplifting",
+        "clean modern inspirational, bold warm colors, minimalist visual metaphor, professional uplifting",
       Contos:
-        "illustrated storybook style, whimsical, rich textures, warm colors, artistic and literary aesthetic",
+        "illustrated storybook style, whimsical, rich textures, warm colors, literary artistic aesthetic",
     };
+    const style = genreStyle[genre] ?? "professional book cover, cinematic dramatic lighting";
+    const prompt = `Professional publishing-quality book cover for "${title}" by ${author}. Subtitle: "${subtitle}". Style: ${style}. Portrait orientation. Large clear space at top for title text, bottom for author name. No text, no letters, no words anywhere in the image. High quality digital art.`;
 
-    const style = genreStyle[genre] ?? "professional book cover, cinematic composition, dramatic lighting";
-    const shortSynopsis = synopsis.slice(0, 180);
-
-    const prompt = `Professional book cover design for a ${genre} book titled "${title}". ${style}. Theme: ${shortSynopsis}. High quality digital art, no text overlaid, portrait orientation, dramatic composition, suitable for commercial publishing.`;
-
-    const response = await openai.images.generate({
+    const resp = await openai.images.generate({
       model: "dall-e-3",
       prompt,
       n: 1,
       size: "1024x1792",
-      quality: "standard",
+      quality: "hd",
     });
 
-    const url = response.data[0]?.url;
-    if (!url) throw new Error("No image URL returned");
+    const url = resp.data[0]?.url;
+    if (!url) throw new Error("No URL returned");
 
-    return { success: true, url };
+    const base64 = await fetchAsBase64(url);
+    return { success: true, base64 };
   } catch (error: any) {
-    console.error("Error generating book cover:", error);
-    return { success: false, error: "Falha ao gerar a capa. Tente novamente." };
+    console.error("generateBookCover error:", error);
+    return { success: false, error: "Falha ao gerar a capa." };
   }
 }
 
-export async function getImageAsBase64(url: string): Promise<string> {
-  const response = await fetch(url);
-  const buffer = await response.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
-  return `data:image/png;base64,${base64}`;
+export async function generateChapterImage(
+  chapterNumber: number,
+  chapterTitle: string,
+  imageDesc: string,
+  genre: string
+): Promise<{ success: boolean; base64?: string; error?: string }> {
+  try {
+    const desc = imageDesc?.trim() || `Scene from chapter ${chapterNumber}: ${chapterTitle}`;
+    const prompt = `Book illustration for a ${genre} book, chapter ${chapterNumber} titled "${chapterTitle}". Scene: ${desc} Warm realistic style, publishing quality. No text, no letters, no words in the image.`;
+
+    const resp = await openai.images.generate({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1792x1024",
+      quality: "hd",
+    });
+
+    const url = resp.data[0]?.url;
+    if (!url) throw new Error("No URL returned");
+
+    const base64 = await fetchAsBase64(url);
+    return { success: true, base64 };
+  } catch (error: any) {
+    console.error(`generateChapterImage error (ch.${chapterNumber}):`, error);
+    return { success: false, error: `Falha ao gerar imagem do capítulo ${chapterNumber}.` };
+  }
 }
 
+// ── Save ──────────────────────────────────────────────────────────────────────
+
 export async function saveBookToProject(result: BookResult, projectName: string) {
-  const name = projectName && projectName.trim() ? projectName : "Livros Gerados";
+  const name = projectName?.trim() || "Livros Gerados";
   return await saveGenerationToDatabase(
     name,
     "book-generator",
