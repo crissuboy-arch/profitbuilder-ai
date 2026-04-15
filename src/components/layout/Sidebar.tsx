@@ -14,7 +14,8 @@ import {
   Search,
   ShoppingCart,
   Wand2,
-  Folder
+  Folder,
+  Users
 } from "lucide-react";
 
 const routes = [
@@ -83,6 +84,12 @@ const routes = [
     icon: BookOpen,
     href: "/dashboard/modules/book-generator",
     color: "text-indigo-500",
+  },
+  {
+    label: "Squads de Agentes",
+    icon: Users,
+    href: "/squads",
+    color: "text-purple-400",
   },
 ];
 
