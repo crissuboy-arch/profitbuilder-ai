@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { generateBook, saveBookToProject, type BookResult } from "./actions";
+import {
+  generateBook,
+  generateBookCover,
+  getImageAsBase64,
+  saveBookToProject,
+  type BookResult,
+} from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +15,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  BookOpen, Loader2, CheckCircle2, Save, FileDown, ChevronDown, ChevronUp,
+  BookOpen,
+  Loader2,
+  CheckCircle2,
+  Save,
+  FileDown,
+  ChevronDown,
+  ChevronUp,
+  Image as ImageIcon,
+  RefreshCw,
 } from "lucide-react";
 
 const LANGUAGE_OPTIONS = [
@@ -32,7 +46,7 @@ const GENRE_COLORS: Record<string, { bg: string; text: string; border: string; b
   Thriller:  { bg: "bg-slate-50",   text: "text-slate-700",   border: "border-slate-200",  badge: "bg-slate-200 text-slate-800" },
   Fantasia:  { bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200", badge: "bg-violet-100 text-violet-700" },
   Autoajuda: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",  badge: "bg-amber-100 text-amber-700" },
-  Contos:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",badge: "bg-emerald-100 text-emerald-700" },
+  Contos:    { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700" },
 };
 
 export default function BookGeneratorPage() {
@@ -44,6 +58,8 @@ export default function BookGeneratorPage() {
   const [expandedChapter, setExpandedChapter] = useState<number | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverLoading, setCoverLoading] = useState(false);
 
   const colors = GENRE_COLORS[genre] ?? GENRE_COLORS["Romance"];
 
@@ -55,6 +71,7 @@ export default function BookGeneratorPage() {
     }
     setLoading(true);
     setResult(null);
+    setCoverUrl(null);
     setExpandedChapter(null);
 
     const { success, data, error } = await generateBook({ language, genre, theme });
@@ -62,11 +79,26 @@ export default function BookGeneratorPage() {
     if (success && data) {
       setResult(data);
       toast.success("Manuscrito gerado com sucesso!");
+      // Auto-generate cover after book is ready
+      fetchCover(data.title, genre, data.synopsis);
     } else {
       toast.error(error || "Falha ao gerar o livro.");
     }
 
     setLoading(false);
+  }
+
+  async function fetchCover(title: string, bookGenre: string, synopsis: string) {
+    setCoverLoading(true);
+    toast.loading("Gerando capa com DALL-E...", { id: "cover-gen" });
+    const { success, url, error } = await generateBookCover(title, bookGenre, synopsis);
+    if (success && url) {
+      setCoverUrl(url);
+      toast.success("Capa gerada!", { id: "cover-gen" });
+    } else {
+      toast.error(error || "Falha ao gerar a capa.", { id: "cover-gen" });
+    }
+    setCoverLoading(false);
   }
 
   async function handleSave() {
@@ -93,7 +125,6 @@ export default function BookGeneratorPage() {
       const mg = 18;
       const cw = W - 2 * mg;
 
-      // Color palette by genre
       const genreColor: Record<string, [number, number, number]> = {
         Romance:   [220, 38, 38],
         Thriller:  [30, 41, 59],
@@ -151,7 +182,6 @@ export default function BookGeneratorPage() {
           if (y > H - 40) { footer(); newPage(); y = 28; }
           const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
 
-          // Bullet list
           const bulletLines = lines.filter(isBullet);
           if (bulletLines.length >= 2) {
             for (const bl of bulletLines) {
@@ -165,7 +195,6 @@ export default function BookGeneratorPage() {
             y += 3; first = false; continue;
           }
 
-          // Internal subtitle
           if (lines.length === 1 && isSubt(block)) {
             y += 4;
             doc.setFont("helvetica", "bold"); doc.setFontSize(13); st(ACCENT);
@@ -174,14 +203,12 @@ export default function BookGeneratorPage() {
             y += 7; first = false; continue;
           }
 
-          // Lead paragraph
           if (first) {
             doc.setFont("helvetica", "normal"); doc.setFontSize(11.5); st(DARK);
             y = wrap(block, mg, y, cw, 7);
             y += 6; first = false; continue;
           }
 
-          // Regular paragraph
           doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(55, 55, 55);
           y = wrap(block, mg, y, cw, 6.2);
           y += 5;
@@ -190,35 +217,71 @@ export default function BookGeneratorPage() {
       };
 
       // ── COVER PAGE ──
-      sf(ACCENT);
-      doc.rect(0, 0, W, H, "F");
-      // decorative strip
-      sf(WHITE);
-      doc.rect(0, H * 0.62, W, H * 0.38, "F");
+      if (coverUrl) {
+        // Embed DALL-E cover image
+        try {
+          const base64 = await getImageAsBase64(coverUrl);
+          doc.addImage(base64, "PNG", 0, 0, W, H);
+          // Overlay gradient strip at bottom for title
+          sf(DARK);
+          doc.setGlobalAlpha(0.65);
+          doc.rect(0, H * 0.58, W, H * 0.42, "F");
+          doc.setGlobalAlpha(1);
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9); st(WHITE);
-      doc.text(genre.toUpperCase(), mg, 30);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8); st(WHITE);
+          doc.setGlobalAlpha(0.8);
+          doc.text(genre.toUpperCase(), mg, H * 0.64);
+          doc.setGlobalAlpha(1);
 
-      doc.setFontSize(34); st(WHITE);
-      const titleLines = doc.splitTextToSize(result.title, cw);
-      let ty = 55;
-      for (const tl of titleLines) { doc.text(tl, mg, ty); ty += 14; }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(28); st(WHITE);
+          const titleLines = doc.splitTextToSize(result.title, cw);
+          let ty = H * 0.70;
+          for (const tl of titleLines) { doc.text(tl, mg, ty); ty += 12; }
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11); st(WHITE);
-      doc.setGlobalAlpha(0.8);
-      doc.text(language, mg, ty + 6);
-      doc.setGlobalAlpha(1);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9); st(WHITE);
+          doc.setGlobalAlpha(0.7);
+          doc.text(language, mg, ty + 4);
+          doc.setGlobalAlpha(1);
+        } catch {
+          // Fallback to solid cover if image fails
+          renderSolidCover();
+        }
+      } else {
+        renderSolidCover();
+      }
 
-      // Synopsis on cover
-      doc.setFontSize(10); st(DARK);
-      const synLines = doc.splitTextToSize(result.synopsis, cw - 10);
-      let sy = H * 0.68;
-      for (const sl of synLines.slice(0, 12)) {
-        if (sy > H - 25) break;
-        doc.text(sl, mg, sy);
-        sy += 5.5;
+      function renderSolidCover() {
+        sf(ACCENT);
+        doc.rect(0, 0, W, H, "F");
+        sf(WHITE);
+        doc.rect(0, H * 0.62, W, H * 0.38, "F");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9); st(WHITE);
+        doc.text(genre.toUpperCase(), mg, 30);
+
+        doc.setFontSize(34); st(WHITE);
+        const titleLines = doc.splitTextToSize(result!.title, cw);
+        let ty = 55;
+        for (const tl of titleLines) { doc.text(tl, mg, ty); ty += 14; }
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11); st(WHITE);
+        doc.setGlobalAlpha(0.8);
+        doc.text(language, mg, ty + 6);
+        doc.setGlobalAlpha(1);
+
+        doc.setFontSize(10); st(DARK);
+        const synLines = doc.splitTextToSize(result!.synopsis, cw - 10);
+        let sy = H * 0.68;
+        for (const sl of synLines.slice(0, 12)) {
+          if (sy > H - 25) break;
+          doc.text(sl, mg, sy);
+          sy += 5.5;
+        }
       }
 
       // ── TABLE OF CONTENTS ──
@@ -252,7 +315,6 @@ export default function BookGeneratorPage() {
         const ch = result.chapters[i];
         newPage();
 
-        // Chapter header accent band
         sf(ACCENT);
         doc.rect(0, 0, W, 42, "F");
 
@@ -268,7 +330,6 @@ export default function BookGeneratorPage() {
           doc.text(tl, mg, chTY); chTY += 9;
         }
 
-        // Chapter content
         let y = 56;
         renderContent(ch.content, y);
         footer();
@@ -293,7 +354,7 @@ export default function BookGeneratorPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gerador de Livros</h1>
           <p className="text-muted-foreground">
-            Crie um manuscrito completo com título, sinopse e 10 capítulos usando IA.
+            Crie um manuscrito completo com Story Chief + squad Storytelling. Capa gerada por DALL-E.
           </p>
         </div>
       </div>
@@ -309,7 +370,6 @@ export default function BookGeneratorPage() {
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-5">
 
-              {/* Language */}
               <div className="space-y-2">
                 <Label>Idioma</Label>
                 <Select value={language} onValueChange={setLanguage}>
@@ -324,7 +384,6 @@ export default function BookGeneratorPage() {
                 </Select>
               </div>
 
-              {/* Genre */}
               <div className="space-y-2">
                 <Label>Gênero Literário</Label>
                 <Select value={genre} onValueChange={setGenre}>
@@ -339,7 +398,6 @@ export default function BookGeneratorPage() {
                 </Select>
               </div>
 
-              {/* Theme */}
               <div className="space-y-2">
                 <Label htmlFor="theme">Tema do Livro</Label>
                 <Input
@@ -378,7 +436,6 @@ export default function BookGeneratorPage() {
         {/* Right Column — Results */}
         <div className="xl:col-span-8 flex flex-col gap-6">
 
-          {/* Empty state */}
           {!result && !loading && (
             <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-slate-50/50">
               <div className="p-4 bg-white rounded-full shadow-sm mb-4">
@@ -391,16 +448,14 @@ export default function BookGeneratorPage() {
             </div>
           )}
 
-          {/* Loading state */}
           {loading && (
             <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-indigo-50/30">
               <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
               <h3 className="text-xl font-medium text-slate-700 animate-pulse">Escrevendo seu manuscrito...</h3>
-              <p className="text-slate-500 text-sm mt-2">Gerando título, sinopse e 10 capítulos completos.</p>
+              <p className="text-slate-500 text-sm mt-2">Story Chief + squad Storytelling em ação.</p>
             </div>
           )}
 
-          {/* Results */}
           {result && !loading && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -440,13 +495,53 @@ export default function BookGeneratorPage() {
                 </div>
               </div>
 
-              {/* Title card */}
-              <Card className={`border-none shadow-md overflow-hidden ${colors.bg}`}>
-                <CardContent className="pt-6 pb-6">
-                  <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${colors.text}`}>{genre}</p>
-                  <h2 className={`text-3xl font-black tracking-tight ${colors.text}`}>{result.title}</h2>
-                </CardContent>
-              </Card>
+              {/* Cover Image */}
+              <div className="flex gap-6">
+                <div className="shrink-0 w-36">
+                  {coverLoading ? (
+                    <div className="w-36 h-52 rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-2 border border-slate-200">
+                      <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+                      <span className="text-xs text-slate-400">DALL-E...</span>
+                    </div>
+                  ) : coverUrl ? (
+                    <div className="relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverUrl}
+                        alt="Capa do livro"
+                        className="w-36 h-52 object-cover rounded-xl shadow-lg border border-slate-200"
+                      />
+                      <button
+                        onClick={() => fetchCover(result.title, genre, result.synopsis)}
+                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition rounded-xl flex items-center justify-center gap-1 text-white text-xs font-medium"
+                      >
+                        <RefreshCw className="w-4 h-4" /> Gerar nova
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fetchCover(result.title, genre, result.synopsis)}
+                      className="w-36 h-52 rounded-xl bg-slate-100 hover:bg-slate-200 transition flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 text-slate-500"
+                    >
+                      <ImageIcon className="w-6 h-6" />
+                      <span className="text-xs text-center px-2">Gerar capa com DALL-E</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Title card */}
+                <Card className={`flex-1 border-none shadow-md overflow-hidden ${colors.bg}`}>
+                  <CardContent className="pt-6 pb-6 h-full flex flex-col justify-center">
+                    <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${colors.text}`}>{genre}</p>
+                    <h2 className={`text-3xl font-black tracking-tight ${colors.text}`}>{result.title}</h2>
+                    {coverUrl && (
+                      <p className="text-xs mt-3 text-slate-400 flex items-center gap-1">
+                        <ImageIcon className="w-3 h-3" /> Capa gerada por DALL-E 3 — incluída no PDF
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
               {/* Synopsis */}
               <Card className="border-none shadow-sm border border-slate-100">
@@ -507,13 +602,15 @@ export default function BookGeneratorPage() {
               <div className="flex justify-center pt-2 pb-4">
                 <Button
                   onClick={handleDownloadPDF}
-                  disabled={pdfLoading}
+                  disabled={pdfLoading || coverLoading}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl text-base px-8 py-5 rounded-full font-bold flex items-center gap-2"
                 >
                   {pdfLoading ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Gerando PDF...</>
+                  ) : coverLoading ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" />Aguardando capa...</>
                   ) : (
-                    <><FileDown className="w-5 h-5" />Baixar Manuscrito em PDF</>
+                    <><FileDown className="w-5 h-5" />Baixar Manuscrito em PDF {coverUrl ? "com Capa" : ""}</>
                   )}
                 </Button>
               </div>
