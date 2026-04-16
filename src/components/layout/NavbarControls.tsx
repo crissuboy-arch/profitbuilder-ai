@@ -34,12 +34,10 @@ export function NavbarControls({ userEmail, userInitial, avatarUrl }: NavbarCont
 
       {/* Language picker */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="outline-none">
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 transition text-xs cursor-pointer">
-            <span className="text-base leading-none">{currentLang?.flag}</span>
-            <span className="hidden sm:inline font-medium">{currentLang?.code.toUpperCase()}</span>
-            <ChevronDown className="w-3 h-3" />
-          </div>
+        <DropdownMenuTrigger className="outline-none flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 transition text-xs cursor-pointer">
+          <span className="text-base leading-none">{currentLang?.flag}</span>
+          <span className="hidden sm:inline font-medium">{currentLang?.code.toUpperCase()}</span>
+          <ChevronDown className="w-3 h-3" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -61,12 +59,10 @@ export function NavbarControls({ userEmail, userInitial, avatarUrl }: NavbarCont
 
       {/* Currency picker */}
       <DropdownMenu>
-        <DropdownMenuTrigger className="outline-none">
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 transition text-xs cursor-pointer">
-            <span className="text-base leading-none">{currentCurrency?.flag}</span>
-            <span className="hidden sm:inline font-medium">{currentCurrency?.code}</span>
-            <ChevronDown className="w-3 h-3" />
-          </div>
+        <DropdownMenuTrigger className="outline-none flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-foreground hover:bg-white/10 dark:hover:bg-white/10 transition text-xs cursor-pointer">
+          <span className="text-base leading-none">{currentCurrency?.flag}</span>
+          <span className="hidden sm:inline font-medium">{currentCurrency?.code}</span>
+          <ChevronDown className="w-3 h-3" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">

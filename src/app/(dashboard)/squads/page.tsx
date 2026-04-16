@@ -134,12 +134,12 @@ export default function SquadsPage() {
                     )}
                   >
                     <span className="text-base leading-none mt-0.5">{agent.icon ?? "🤖"}</span>
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{agent.name}</div>
+                    <span className="min-w-0 flex flex-col">
+                      <span className="font-medium truncate">{agent.name}</span>
                       {agent.title && (
-                        <div className="text-xs text-slate-500 truncate mt-0.5">{agent.title}</div>
+                        <span className="text-xs text-slate-500 truncate mt-0.5">{agent.title}</span>
                       )}
-                    </div>
+                    </span>
                   </button>
                 ))}
               </div>

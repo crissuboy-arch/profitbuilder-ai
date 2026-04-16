@@ -309,24 +309,26 @@ export default function ProductMinerPage() {
                 </div>
 
                 {/* ── Deep Search toggle ────────────────────────────────────── */}
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setDeepSearch((v) => !v)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setDeepSearch((v) => !v); }}
                   className={cn(
-                    "w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 text-left",
+                    "w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 cursor-pointer select-none",
                     deepSearch
                       ? "bg-[#00d4aa]/10 border-[#00d4aa]/40"
                       : "bg-white/5 border-border/40 hover:border-border/70"
                   )}
                 >
-                  <div className={cn(
+                  <span className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
                     deepSearch ? "bg-[#00d4aa]/20" : "bg-white/10"
                   )}>
                     <Wifi className={cn("w-4 h-4", deepSearch ? "text-[#00d4aa]" : "text-muted-foreground")} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                  </span>
+                  <span className="flex-1 min-w-0 flex flex-col">
+                    <span className="flex items-center gap-2">
                       <span className={cn(
                         "text-xs font-bold",
                         deepSearch ? "text-[#00d4aa]" : "text-foreground"
@@ -338,22 +340,22 @@ export default function ProductMinerPage() {
                           ON
                         </span>
                       )}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                    </span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
                       {t("pm.ds.desc")}
-                    </p>
-                  </div>
+                    </span>
+                  </span>
                   {/* Toggle pill */}
-                  <div className={cn(
-                    "w-10 h-5 rounded-full transition-colors duration-200 relative shrink-0",
+                  <span className={cn(
+                    "w-10 h-5 rounded-full transition-colors duration-200 relative shrink-0 inline-flex items-center",
                     deepSearch ? "bg-[#00d4aa]" : "bg-border"
                   )}>
-                    <div className={cn(
+                    <span className={cn(
                       "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200",
                       deepSearch ? "left-5" : "left-0.5"
                     )} />
-                  </div>
-                </button>
+                  </span>
+                </div>
 
                 <Button
                   type="submit"
