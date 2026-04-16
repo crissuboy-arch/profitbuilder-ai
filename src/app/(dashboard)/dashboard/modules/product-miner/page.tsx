@@ -1,193 +1,333 @@
 "use client";
 
 import { useState } from "react";
-import { generateProducts, saveProductToProject, saveMultipleProductsToProject, type ProductIdea } from "./actions";
+import { useRouter } from "next/navigation";
+import {
+  generateProducts,
+  saveProductToProject,
+  saveMultipleProductsToProject,
+  type ProductIdea,
+  type CompetitionLevel,
+} from "./actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CountrySelect } from "@/components/shared/CountrySelect";
-import { LanguageSelect } from "@/components/shared/LanguageSelect";
 import { toast } from "sonner";
-import { Loader2, PlusCircle, Search, Sparkles, CheckCircle2, Save, DollarSign, Users, Zap, Package } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { useCurrency } from "@/lib/currency";
+import { cn } from "@/lib/utils";
+import {
+  Loader2, PlusCircle, Search, Sparkles, CheckCircle2, Save,
+  Users, Zap, TrendingUp, ArrowRight, BarChart2, Package2,
+  ExternalLink,
+} from "lucide-react";
+
+// ── Output language options (for AI content, separate from UI language) ────────
+
+const OUTPUT_LANGS = [
+  { value: "Português (PT-BR)", label: "🇧🇷 Português (PT-BR)" },
+  { value: "English",           label: "🇺🇸 English" },
+  { value: "Spanish",           label: "🇪🇸 Español" },
+  { value: "French",            label: "🇫🇷 Français" },
+  { value: "German",            label: "🇩🇪 Deutsch" },
+  { value: "Italian",           label: "🇮🇹 Italiano" },
+];
+
+// ── Competition level style config ─────────────────────────────────────────────
+
+const COMPETITION_STYLE: Record<CompetitionLevel, { bg: string; text: string; dot: string }> = {
+  Low:    { bg: "bg-emerald-500/15", text: "text-emerald-400", dot: "bg-emerald-400" },
+  Medium: { bg: "bg-amber-500/15",   text: "text-amber-400",   dot: "bg-amber-400" },
+  High:   { bg: "bg-red-500/15",     text: "text-red-400",     dot: "bg-red-400" },
+};
+
+const DEFAULT_COMPETITION_STYLE = COMPETITION_STYLE["Medium"];
+
+// ── Platform badge colors ──────────────────────────────────────────────────────
+
+const PLATFORM_COLORS: Record<string, string> = {
+  Hotmart:    "bg-[#FF6B35]/15 text-[#FF6B35] border-[#FF6B35]/20",
+  Kiwify:     "bg-violet-500/15 text-violet-400 border-violet-500/20",
+  Eduzz:      "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  Monetizze:  "bg-cyan-500/15 text-cyan-400 border-cyan-500/20",
+  Teachable:  "bg-pink-500/15 text-pink-400 border-pink-500/20",
+  Kajabi:     "bg-indigo-500/15 text-indigo-400 border-indigo-500/20",
+  Gumroad:    "bg-rose-500/15 text-rose-400 border-rose-500/20",
+  Thinkific:  "bg-teal-500/15 text-teal-400 border-teal-500/20",
+  Udemy:      "bg-orange-500/15 text-orange-400 border-orange-500/20",
+};
+
+function getPlatformStyle(platform: string): string {
+  return PLATFORM_COLORS[platform] ?? "bg-slate-500/15 text-slate-400 border-slate-500/20";
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function ProductMinerPage() {
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ProductIdea[]>([]);
-  const [currentProjectName, setCurrentProjectName] = useState("");
-  const [parsedLanguage, setParsedLanguage] = useState("");
+  const router    = useRouter();
+  const { t }     = useLanguage();
+  const { format: formatCurrency, currency } = useCurrency();
 
-  async function onSubmit(formData: FormData) {
+  const [loading, setLoading]             = useState(false);
+  const [results, setResults]             = useState<ProductIdea[]>([]);
+  const [currentProjectName, setCurrentProjectName] = useState("");
+  const [outputLang, setOutputLang]       = useState("Português (PT-BR)");
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd   = new FormData(form);
+
     setLoading(true);
     setResults([]);
 
-    const language = formData.get("language") as string;
-    setParsedLanguage(language);
-
-    const niche = formData.get("niche") as string;
-    setCurrentProjectName(`${niche} Products`);
+    const niche = fd.get("niche") as string;
+    setCurrentProjectName(`${niche} — Products`);
 
     const params = {
-      niche: niche,
-      subniche: formData.get("subniche") as string,
-      businessType: formData.get("businessType") as string,
-      country: formData.get("country") as string,
-      language: language,
-      targetAudience: formData.get("targetAudience") as string,
-      targetGoal: formData.get("targetGoal") as string,
+      niche,
+      subniche:       fd.get("subniche")       as string,
+      businessType:   fd.get("businessType")   as string,
+      country:        fd.get("country")        as string,
+      language:       outputLang,
+      targetAudience: fd.get("targetAudience") as string,
+      targetGoal:     fd.get("targetGoal")     as string,
     };
 
     const { success, data, error } = await generateProducts(params);
 
     if (success && data) {
       setResults(data);
-      toast.success(`Successfully generated ideas translated to ${language}!`);
+      toast.success(`${data.length} ${t("pm.results.count")} ✓`);
     } else {
-      toast.error(error || "Failed to generate ideas. Please try again.");
+      toast.error(error || "Failed to generate ideas.");
     }
 
     setLoading(false);
   }
 
-  async function handleSave(product: ProductIdea) {
-    toast.loading("Saving to project...", { id: product.productName });
-    const { success, message, error } = await saveProductToProject(product, currentProjectName);
+  // ── Save single ─────────────────────────────────────────────────────────────
 
+  async function handleSave(product: ProductIdea) {
+    toast.loading(`${t("pm.results.save")}...`, { id: product.productName });
+    const { success, message, error } = await saveProductToProject(product, currentProjectName);
     if (success) {
-      toast.success(message, { id: product.productName });
-      localStorage.setItem("lastMinedProduct", JSON.stringify(product));
+      toast.success(message ?? t("pm.results.save"), { id: product.productName });
     } else {
-      toast.error(error, { id: product.productName });
+      toast.error(error ?? "Failed to save.", { id: product.productName });
     }
   }
+
+  // ── Save all ────────────────────────────────────────────────────────────────
 
   async function handleSaveAll() {
     if (results.length === 0) return;
-    toast.loading("Saving cluster to project...", { id: "save-all" });
+    toast.loading(`${t("pm.results.saveAll")}...`, { id: "save-all" });
     const { success, message, error } = await saveMultipleProductsToProject(results, currentProjectName);
-
     if (success) {
-      toast.success(message, { id: "save-all" });
+      toast.success(message ?? "Saved!", { id: "save-all" });
     } else {
-      toast.error(error, { id: "save-all" });
+      toast.error(error ?? "Failed.", { id: "save-all" });
     }
   }
 
+  // ── Navigate to Product Builder with pre-fill ────────────────────────────────
+
+  function handleCreateProduct(product: ProductIdea) {
+    localStorage.setItem(
+      "prefill-product",
+      JSON.stringify({
+        name:     product.productName,
+        type:     product.productType,
+        audience: product.targetAudience,
+        problem:  product.mainProblemSolved,
+        format:   product.recommendedFormat,
+      })
+    );
+    router.push("/dashboard/modules/product-builder");
+  }
+
+  // ── Price display ────────────────────────────────────────────────────────────
+
+  function displayPrice(product: ProductIdea): string {
+    if (currency === "USD") return `$ ${product.priceUSD}`;
+    if (currency === "EUR") return `€ ${product.priceEUR}`;
+    return `R$ ${product.priceBRL}`;
+  }
+
+  // ── Competition label ────────────────────────────────────────────────────────
+
+  function competitionLabel(level: CompetitionLevel): string {
+    if (level === "Low")    return t("pm.competition.low");
+    if (level === "High")   return t("pm.competition.high");
+    return t("pm.competition.medium");
+  }
+
+  const competitionStyle = (level?: CompetitionLevel) =>
+    COMPETITION_STYLE[level as CompetitionLevel] ?? DEFAULT_COMPETITION_STYLE;
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
-    <div className="p-8 max-w-7xl mx-auto font-[family-name:var(--font-geist-sans)]">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-10">
-        <div className="p-3 bg-violet-600 rounded-2xl shadow-lg shadow-violet-200">
-          <Search className="w-7 h-7 text-white" />
+      <div className="flex items-center gap-4 mb-8">
+        <div className="p-3 btn-cta rounded-2xl shadow-lg">
+          <Search className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Product Miner</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Discover high-converting product opportunities in any niche.</p>
+          <h1 className="text-2xl md:text-3xl font-black tracking-tight">{t("pm.title")}</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">{t("pm.subtitle")}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-        {/* Left — Form */}
+        {/* ── Form ──────────────────────────────────────────────────────────── */}
         <div className="lg:col-span-4">
-          <Card className="sticky top-24 border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-900 px-6 py-5">
-              <CardTitle className="text-white text-base font-semibold">Mining Parameters</CardTitle>
-              <CardDescription className="text-slate-400 text-sm">Enter details to find your next winning product.</CardDescription>
+          <Card className="sticky top-24 glass card-premium rounded-2xl overflow-hidden border-border/50">
+            <CardHeader className="px-6 py-5 bg-gradient-to-r from-violet-600/20 to-purple-600/10 border-b border-border/50">
+              <CardTitle className="text-sm font-semibold">{t("pm.form.title")}</CardTitle>
+              <p className="text-xs text-muted-foreground">{t("pm.form.desc")}</p>
             </CardHeader>
             <CardContent className="px-6 pt-6 pb-2">
-              <form action={onSubmit} className="space-y-5">
+              <form onSubmit={onSubmit} className="space-y-4">
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="niche" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Niche</Label>
-                  <Input id="niche" name="niche" placeholder="e.g., Finance, Health, Technology" className="rounded-lg border-slate-200 focus:border-violet-400 focus:ring-violet-400 bg-slate-50" required />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("pm.form.niche")}
+                  </Label>
+                  <Input
+                    name="niche"
+                    placeholder={t("pm.form.niche.ph")}
+                    className="rounded-lg"
+                    required
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="subniche" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sub-niche</Label>
-                  <Input id="subniche" name="subniche" placeholder="e.g., Day Trading, Keto Diet" className="rounded-lg border-slate-200 bg-slate-50" required />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("pm.form.subniche")}
+                  </Label>
+                  <Input
+                    name="subniche"
+                    placeholder={t("pm.form.subniche.ph")}
+                    className="rounded-lg"
+                    required
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="businessType" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Business Type</Label>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("pm.form.businessType")}
+                  </Label>
                   <Select name="businessType" defaultValue="Info-product">
-                    <SelectTrigger className="rounded-lg border-slate-200 bg-slate-50">
-                      <SelectValue placeholder="Select type" />
+                    <SelectTrigger className="rounded-lg">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Info-product">Info-product (Courses/E-books)</SelectItem>
-                      <SelectItem value="SaaS">SaaS (Software)</SelectItem>
-                      <SelectItem value="Service">Agency / Service</SelectItem>
-                      <SelectItem value="Physical">Physical Product / Dropshipping</SelectItem>
+                      <SelectItem value="Info-product">{t("pm.form.bt.info")}</SelectItem>
+                      <SelectItem value="SaaS">{t("pm.form.bt.saas")}</SelectItem>
+                      <SelectItem value="Service">{t("pm.form.bt.service")}</SelectItem>
+                      <SelectItem value="Physical">{t("pm.form.bt.physical")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="targetAudience" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Target Audience</Label>
-                  <Input id="targetAudience" name="targetAudience" placeholder="e.g., Small business owners" className="rounded-lg border-slate-200 bg-slate-50" required />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("pm.form.audience")}
+                  </Label>
+                  <Input
+                    name="targetAudience"
+                    placeholder={t("pm.form.audience.ph")}
+                    className="rounded-lg"
+                    required
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="targetGoal" className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Your Main Goal</Label>
-                  <Input id="targetGoal" name="targetGoal" placeholder="e.g., High ticket sales, recurring MRR" className="rounded-lg border-slate-200 bg-slate-50" required />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {t("pm.form.goal")}
+                  </Label>
+                  <Input
+                    name="targetGoal"
+                    placeholder={t("pm.form.goal.ph")}
+                    className="rounded-lg"
+                    required
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-5">
-                  <CountrySelect />
-                  <LanguageSelect />
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
+                  <CountrySelect label={t("pm.form.country")} />
+                  {/* Output language (for AI content) */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {t("pm.form.outputLang")}
+                    </Label>
+                    <Select
+                      value={outputLang}
+                      onValueChange={(v) => { if (v) setOutputLang(v); }}
+                    >
+                      <SelectTrigger className="rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {OUTPUT_LANGS.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-xl py-5 shadow-md shadow-violet-100 transition-all"
+                  className="w-full btn-cta font-semibold rounded-xl py-5"
                   disabled={loading}
                 >
                   {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Mining Intel...
-                    </>
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("pm.form.mining")}</>
                   ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate Ideas
-                    </>
+                    <><Sparkles className="mr-2 h-4 w-4" />{t("pm.form.generate")}</>
                   )}
                 </Button>
-
               </form>
             </CardContent>
             <div className="px-6 pb-6" />
           </Card>
         </div>
 
-        {/* Right — Results */}
+        {/* ── Results ───────────────────────────────────────────────────────── */}
         <div className="lg:col-span-8 flex flex-col gap-6">
 
+          {/* Empty state */}
           {results.length === 0 && !loading && (
-            <div className="flex flex-col items-center justify-center h-[520px] rounded-2xl border-2 border-dashed border-slate-200 bg-white">
-              <div className="w-16 h-16 rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
+            <div className="flex flex-col items-center justify-center h-[520px] rounded-2xl border-2 border-dashed border-border/50 bg-background/40">
+              <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-4">
                 <Search className="w-8 h-8 text-violet-400" />
               </div>
-              <h3 className="text-lg font-bold text-slate-700">Awaiting Instructions</h3>
-              <p className="text-slate-400 text-sm max-w-xs text-center mt-2 leading-relaxed">
-                Fill out the parameters and hit generate to discover your next winning product.
+              <h3 className="text-base font-bold">{t("pm.empty.title")}</h3>
+              <p className="text-muted-foreground text-sm max-w-xs text-center mt-2 leading-relaxed">
+                {t("pm.empty.desc")}
               </p>
             </div>
           )}
 
+          {/* Loading state */}
           {loading && (
-            <div className="flex flex-col items-center justify-center h-[520px] rounded-2xl border-2 border-dashed border-violet-100 bg-violet-50/40">
-              <div className="relative mb-6">
-                <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center">
-                  <Loader2 className="w-8 h-8 text-violet-600 animate-spin" />
-                </div>
+            <div className="flex flex-col items-center justify-center h-[520px] rounded-2xl border-2 border-dashed border-violet-500/20 bg-violet-500/5">
+              <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-5">
+                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
               </div>
-              <h3 className="text-lg font-bold text-slate-700 animate-pulse">Analyzing Market Gaps...</h3>
-              <p className="text-slate-500 text-sm mt-2">Parsing through localized market data...</p>
+              <h3 className="text-base font-bold animate-pulse">{t("pm.loading.title")}</h3>
+              <p className="text-muted-foreground text-sm mt-2">{t("pm.loading.desc")}</p>
             </div>
           )}
 
@@ -195,79 +335,180 @@ export default function ProductMinerPage() {
             <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               {/* Toolbar */}
-              <div className="flex justify-between items-center bg-white border border-slate-200 rounded-2xl px-5 py-3.5 shadow-sm">
+              <div className="flex justify-between items-center glass rounded-2xl px-5 py-3.5 border border-border/50">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-violet-100 flex items-center justify-center">
-                    <CheckCircle2 className="w-4 h-4 text-violet-600" />
-                  </div>
-                  <span className="text-sm font-semibold text-slate-800">10 Profitable Ideas Generated</span>
-                  <span className="ml-1 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full border border-slate-200">
-                    {parsedLanguage}
+                  <CheckCircle2 className="w-4 h-4 text-[#00d4aa]" />
+                  <span className="text-sm font-semibold">
+                    {results.length} {t("pm.results.count")}
+                  </span>
+                  <span className="text-xs bg-violet-500/15 text-violet-400 px-2 py-0.5 rounded-full border border-violet-500/20">
+                    {outputLang.split(" ")[0]}
                   </span>
                 </div>
                 <Button
                   onClick={handleSaveAll}
-                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl px-4 py-2 shadow-sm"
+                  size="sm"
+                  className="btn-cta text-xs font-semibold rounded-xl px-4"
                 >
                   <Save className="w-3.5 h-3.5 mr-1.5" />
-                  Save All to Project
+                  {t("pm.results.saveAll")}
                 </Button>
               </div>
 
-              {/* Cards Grid */}
+              {/* Cards grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {results.map((product, index) => (
-                  <Card key={index} className="flex flex-col rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 bg-white overflow-hidden">
+                {results.map((product, index) => {
+                  const compStyle = competitionStyle(product.competitionLevel as CompetitionLevel);
 
-                    {/* Card Top Accent */}
-                    <div className="h-1 w-full bg-gradient-to-r from-violet-500 to-purple-400" />
+                  return (
+                    <Card
+                      key={index}
+                      className="flex flex-col rounded-2xl glass card-premium border border-border/50 hover:border-violet-500/30 transition-all duration-200 overflow-hidden"
+                    >
+                      {/* Top accent bar */}
+                      <div className="h-0.5 w-full bg-gradient-to-r from-violet-500 via-[#00d4aa] to-purple-500" />
 
-                    <CardHeader className="pb-3 px-5 pt-4">
-                      <div className="flex justify-between items-start gap-3">
-                        <CardTitle className="text-base font-bold leading-snug text-slate-900">
-                          {product.productName}
-                        </CardTitle>
-                        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-xs font-bold">
-                          <DollarSign className="w-3 h-3" />
-                          {product.priceRange}
-                        </span>
-                      </div>
-                      <div className="mt-1.5 inline-flex items-center gap-1.5">
-                        <Package className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-xs text-slate-500 font-medium">{product.recommendedFormat}</span>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="px-5 pt-0 flex-1 space-y-3">
-                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <Users className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Target Audience</p>
-                          <p className="text-sm text-slate-700 leading-snug">{product.targetAudience}</p>
+                      {/* Header */}
+                      <CardHeader className="pb-2 px-5 pt-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="text-base font-bold leading-snug line-clamp-2">
+                              {product.productName}
+                            </CardTitle>
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <Package2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                              <span className="text-xs text-muted-foreground font-medium">
+                                {product.productType}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Competition badge */}
+                          <div
+                            className={cn(
+                              "shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border",
+                              compStyle.bg,
+                              compStyle.text,
+                              "border-current/20"
+                            )}
+                          >
+                            <span className={cn("w-1.5 h-1.5 rounded-full", compStyle.dot)} />
+                            {competitionLabel(product.competitionLevel as CompetitionLevel)}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <Zap className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Problem Solved</p>
-                          <p className="text-sm text-slate-700 leading-snug">{product.mainProblemSolved}</p>
+                      </CardHeader>
+
+                      <CardContent className="px-5 pt-0 flex-1 space-y-3">
+
+                        {/* Audience */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white/5 border border-border/40">
+                          <Users className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                              {t("pm.card.audience")}
+                            </p>
+                            <p className="text-xs leading-snug">{product.targetAudience}</p>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
 
-                    <CardFooter className="px-5 pb-4 pt-3 border-t border-slate-100">
-                      <Button
-                        variant="outline"
-                        className="w-full border-slate-200 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 text-slate-600 text-sm font-semibold rounded-xl transition-colors"
-                        onClick={() => handleSave(product)}
-                      >
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Save to Project
-                      </Button>
-                    </CardFooter>
+                        {/* Problem solved */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white/5 border border-border/40">
+                          <Zap className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                              {t("pm.card.problem")}
+                            </p>
+                            <p className="text-xs leading-snug">{product.mainProblemSolved}</p>
+                          </div>
+                        </div>
 
-                  </Card>
-                ))}
+                        {/* Metrics row: price | competition | profit */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-2.5 rounded-xl bg-[#00d4aa]/10 border border-[#00d4aa]/20 text-center">
+                            <p className="text-sm font-black text-[#00d4aa]">{displayPrice(product)}</p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide mt-0.5">
+                              {t("pm.card.price")}
+                            </p>
+                          </div>
+                          <div className={cn("p-2.5 rounded-xl border text-center", compStyle.bg, "border-current/20")}>
+                            <p className={cn("text-sm font-black", compStyle.text)}>
+                              {competitionLabel(product.competitionLevel as CompetitionLevel)}
+                            </p>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide mt-0.5">
+                              {t("pm.card.competition")}
+                            </p>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
+                            <BarChart2 className="w-3.5 h-3.5 text-purple-400 mx-auto" />
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide mt-0.5">
+                              {t("pm.card.profit")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Profit potential full text */}
+                        <p className="text-xs text-muted-foreground leading-relaxed px-1">
+                          <span className="font-semibold text-purple-400">{t("pm.card.profit")}: </span>
+                          {product.profitPotential}
+                        </p>
+
+                        {/* Market trend */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-white/5 border border-border/40">
+                          <TrendingUp className="w-4 h-4 text-[#00d4aa] mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">
+                              {t("pm.card.trend")}
+                            </p>
+                            <p className="text-xs leading-snug">{product.marketTrend}</p>
+                          </div>
+                        </div>
+
+                        {/* Platforms */}
+                        {product.recommendedPlatforms?.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                              {t("pm.card.platforms")}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {product.recommendedPlatforms.map((p) => (
+                                <span
+                                  key={p}
+                                  className={cn(
+                                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
+                                    getPlatformStyle(p)
+                                  )}
+                                >
+                                  {p}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                      </CardContent>
+
+                      {/* Footer actions */}
+                      <CardFooter className="px-5 pb-4 pt-3 border-t border-border/40 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs font-semibold rounded-xl hover:border-violet-500/40"
+                          onClick={() => handleSave(product)}
+                        >
+                          <PlusCircle className="w-3.5 h-3.5 mr-1.5" />
+                          {t("pm.results.save")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 btn-cta text-xs font-semibold rounded-xl"
+                          onClick={() => handleCreateProduct(product)}
+                        >
+                          {t("pm.results.create")}
+                          <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}
