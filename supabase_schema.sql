@@ -129,3 +129,66 @@ create policy "Users can insert own playbooks." on public.playbooks
 -- Owner can delete their own playbooks
 create policy "Users can delete own playbooks." on public.playbooks
   for delete using (auth.uid() = user_id);
+
+-- 7. Social Publisher tables
+
+-- Platform connections (Instagram, TikTok) per user
+create table public.sp_platforms (
+  id               uuid default uuid_generate_v4() primary key,
+  user_id          uuid references auth.users(id) on delete cascade not null,
+  name             text not null,          -- 'instagram' | 'tiktok'
+  display_name     text not null,
+  credentials      jsonb not null default '{}',  -- {access_token, ig_user_id / open_id, ...}
+  is_active        boolean default false,
+  token_expires_at timestamptz,
+  created_at       timestamptz default timezone('utc'::text, now()) not null,
+  updated_at       timestamptz default timezone('utc'::text, now()) not null,
+  unique (user_id, name)
+);
+
+alter table public.sp_platforms enable row level security;
+create policy "Users manage own sp_platforms." on public.sp_platforms
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Scheduled posts
+create table public.sp_posts (
+  id           uuid default uuid_generate_v4() primary key,
+  user_id      uuid references auth.users(id) on delete cascade not null,
+  caption      text not null,
+  hashtags     text[] default '{}',
+  scheduled_at timestamptz not null,
+  status       text not null default 'pending',  -- pending | processing | published | partial | failed | cancelled
+  post_type    text not null default 'image',    -- image | video
+  media_url    text,
+  metadata     jsonb default '{}',
+  created_at   timestamptz default timezone('utc'::text, now()) not null,
+  updated_at   timestamptz default timezone('utc'::text, now()) not null
+);
+
+alter table public.sp_posts enable row level security;
+create policy "Users manage own sp_posts." on public.sp_posts
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Post ↔ Platform join (one row per platform per post)
+create table public.sp_post_platforms (
+  id            uuid default uuid_generate_v4() primary key,
+  post_id       uuid references public.sp_posts(id) on delete cascade not null,
+  platform_id   uuid references public.sp_platforms(id) not null,
+  status        text not null default 'pending',
+  external_id   text,
+  external_url  text,
+  error_message text,
+  published_at  timestamptz,
+  created_at    timestamptz default timezone('utc'::text, now()) not null,
+  updated_at    timestamptz default timezone('utc'::text, now()) not null,
+  unique (post_id, platform_id)
+);
+
+alter table public.sp_post_platforms enable row level security;
+create policy "Users manage own sp_post_platforms." on public.sp_post_platforms
+  for all using (
+    exists (select 1 from public.sp_posts where id = post_id and user_id = auth.uid())
+  )
+  with check (
+    exists (select 1 from public.sp_posts where id = post_id and user_id = auth.uid())
+  );

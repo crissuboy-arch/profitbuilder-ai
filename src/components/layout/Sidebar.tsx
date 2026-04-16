@@ -13,6 +13,7 @@ import {
   Package,
   PenTool,
   Search,
+  Send,
   ShoppingCart,
   Wand2,
   Folder,
@@ -98,6 +99,14 @@ const NAV_ITEMS = [
     color: "text-indigo-400",
     badge: true,
     glow:  "group-hover:drop-shadow-[0_0_6px_rgb(129,140,248)]",
+  },
+  {
+    key:   "nav.socialPublisher",
+    icon:  Send,
+    href:  "/dashboard/modules/social-publisher",
+    color: "text-pink-400",
+    badge: true,
+    glow:  "group-hover:drop-shadow-[0_0_6px_rgb(244,114,182)]",
   },
   {
     key:   "nav.squads",
