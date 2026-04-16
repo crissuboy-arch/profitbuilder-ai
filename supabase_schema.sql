@@ -26,6 +26,10 @@ create policy "Users can view own profile." on public.users
 create policy "Users can update own profile." on public.users
   for update using (auth.uid() = id);
 
+-- Users can insert their own profile (needed when trigger is missing)
+create policy "Users can insert own profile." on public.users
+  for insert with check (auth.uid() = id);
+
 -- 3. Trigger to automatically create a profile when a new user signs up
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -97,4 +101,31 @@ create policy "Users can update own generations." on public.generations
 
 -- Users can delete their own generations
 create policy "Users can delete own generations." on public.generations
+  for delete using (auth.uid() = user_id);
+
+-- 6. Playbooks (public shareable playbook reader)
+-- References auth.users directly to avoid dependency on public.users trigger
+create table public.playbooks (
+  id            uuid default uuid_generate_v4() primary key,
+  user_id       uuid references auth.users(id) on delete cascade not null,
+  title         text not null,
+  author        text not null,
+  genre         text not null default 'Autoajuda',
+  cover_base64  text,
+  chapters      jsonb not null default '[]',  -- [{number, title, blocks, imageBase64}]
+  created_at    timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.playbooks enable row level security;
+
+-- ANYONE can view a playbook by its ID (public sharing, no login required)
+create policy "Public can view playbooks." on public.playbooks
+  for select using (true);
+
+-- Only authenticated owner can create
+create policy "Users can insert own playbooks." on public.playbooks
+  for insert with check (auth.uid() = user_id);
+
+-- Owner can delete their own playbooks
+create policy "Users can delete own playbooks." on public.playbooks
   for delete using (auth.uid() = user_id);

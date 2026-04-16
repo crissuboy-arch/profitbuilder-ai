@@ -9,10 +9,19 @@ export async function getOrCreateProject(projectName: string): Promise<string> {
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
-    throw new Error("You must be logged in to save a project.");
+    throw new Error("Você precisa estar logado para salvar. Faça login e tente novamente.");
   }
 
   const userId = authData.user.id;
+  const userEmail = authData.user.email ?? `${userId}@user.com`;
+
+  // Ensure the user exists in public.users (FK required by projects table).
+  // The trigger on_auth_user_created handles this at sign-up, but may be missing
+  // for users created before the trigger was set up.
+  await supabase
+    .from("users")
+    .upsert({ id: userId, email: userEmail }, { onConflict: "id", ignoreDuplicates: true });
+  // Non-fatal: if RLS blocks the upsert the user row already exists.
 
   // Check if project exists
   const { data: existingProject, error: fetchError } = await supabase

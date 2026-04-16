@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { openai, DEFAULT_MODEL } from "@/lib/openai";
 import { saveGenerationToDatabase } from "@/lib/projects";
+import { createClient } from "@/utils/supabase/server";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -342,7 +343,7 @@ export async function generateChapterImage(
   }
 }
 
-// ── Save ──────────────────────────────────────────────────────────────────────
+// ── Save to project ───────────────────────────────────────────────────────────
 
 export async function saveBookToProject(result: BookResult, projectName: string) {
   const name = projectName?.trim() || "Livros Gerados";
@@ -351,4 +352,57 @@ export async function saveBookToProject(result: BookResult, projectName: string)
     { title: result.title.substring(0, 50) },
     result
   );
+}
+
+// ── Save playbook (public shareable) ─────────────────────────────────────────
+
+export type PlaybookChapterData = BookChapter & { imageBase64: string | null };
+
+export type SavePlaybookParams = {
+  result:        BookResult;
+  coverBase64:   string | null;
+  chapterImages: Record<number, string>;
+  authorName:    string;
+  genre:         string;
+};
+
+export async function savePlaybook(
+  params: SavePlaybookParams
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return { success: false, error: "Você precisa estar logado para compartilhar." };
+    }
+
+    const chapters: PlaybookChapterData[] = params.result.chapters.map((ch) => ({
+      ...ch,
+      imageBase64: params.chapterImages[ch.number] ?? null,
+    }));
+
+    const { data, error } = await supabase
+      .from("playbooks")
+      .insert({
+        user_id:       user.id,
+        title:         params.result.title,
+        author:        params.authorName || params.result.author,
+        genre:         params.genre,
+        cover_base64:  params.coverBase64,
+        chapters,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("savePlaybook error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, id: data.id };
+  } catch (err: any) {
+    console.error("savePlaybook catch:", err);
+    return { success: false, error: err.message ?? "Falha ao salvar playbook." };
+  }
 }

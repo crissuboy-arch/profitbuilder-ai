@@ -7,6 +7,7 @@ import {
   generateBookCover,
   generateChapterImage,
   saveBookToProject,
+  savePlaybook,
   type BookResult,
   type BookBlock,
   type ImproveMode,
@@ -20,7 +21,7 @@ import { toast } from "sonner";
 import {
   BookOpen, Loader2, CheckCircle2, Save, FileDown, ChevronDown, ChevronUp,
   Image as ImageIcon, Upload, FileText, ChevronLeft, ChevronRight,
-  BookMarked, Sparkles, X,
+  BookMarked, Sparkles, X, Share2, Copy, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -91,6 +92,11 @@ export default function BookGeneratorPage() {
   // View
   const [viewMode, setViewMode]             = useState<ViewMode>("book");
   const [playbookChapter, setPlaybookChapter] = useState(0);
+
+  // Playbook share
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareUrl, setShareUrl]         = useState<string | null>(null);
+  const [copied, setCopied]             = useState(false);
 
   // Images
   const [coverBase64, setCoverBase64]     = useState<string | null>(null);
@@ -215,6 +221,35 @@ export default function BookGeneratorPage() {
     } finally {
       setSaveLoading(false);
     }
+  }
+
+  // ── Share Playbook ─────────────────────────────────────────────────────────
+
+  async function handleSharePlaybook() {
+    if (!result) return;
+    setShareLoading(true);
+    setShareUrl(null);
+    toast.loading("Salvando playbook...", { id: "share-playbook" });
+
+    const { success, id, error } = await savePlaybook({
+      result,
+      coverBase64,
+      chapterImages,
+      authorName,
+      genre,
+    });
+
+    if (success && id) {
+      const url = `${window.location.origin}/playbook/${id}`;
+      setShareUrl(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+      toast.success("Link copiado! Playbook público criado.", { id: "share-playbook" });
+    } else {
+      toast.error(error ?? "Falha ao criar link.", { id: "share-playbook" });
+    }
+    setShareLoading(false);
   }
 
   // ── PDF generation ─────────────────────────────────────────────────────────
@@ -845,7 +880,7 @@ export default function BookGeneratorPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs px-2 py-1 rounded-md ${colors.badge}`}>{genre}</span>
                   <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md">{language}</span>
-                  {imagesReady && (
+                  {result && (
                     <Button
                       onClick={() => { setViewMode("playbook"); setPlaybookChapter(0); }}
                       variant="outline"
@@ -860,6 +895,20 @@ export default function BookGeneratorPage() {
                       ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       : <Save className="w-3.5 h-3.5 mr-1.5" />}
                     Salvar
+                  </Button>
+                  <Button
+                    onClick={handleSharePlaybook}
+                    disabled={shareLoading}
+                    variant="outline"
+                    size="sm"
+                    className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                  >
+                    {shareLoading
+                      ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      : copied
+                      ? <Check className="w-3.5 h-3.5 mr-1.5 text-green-600" />
+                      : <Share2 className="w-3.5 h-3.5 mr-1.5" />}
+                    {copied ? "Copiado!" : "Compartilhar"}
                   </Button>
                   <Button
                     onClick={handleDownloadPDF}
@@ -877,6 +926,40 @@ export default function BookGeneratorPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Share URL display */}
+              {shareUrl && (
+                <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+                  <Share2 className="w-4 h-4 text-purple-500 shrink-0" />
+                  <a
+                    href={shareUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-purple-700 font-mono truncate flex-1 hover:underline"
+                  >
+                    {shareUrl}
+                  </a>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareUrl).catch(() => {});
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 3000);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        navigator.clipboard.writeText(shareUrl).catch(() => {});
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 3000);
+                      }
+                    }}
+                    className="shrink-0 p-1.5 rounded-lg hover:bg-purple-100 cursor-pointer transition"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-purple-500" />}
+                  </div>
+                </div>
+              )}
 
               {/* Cover + book info */}
               <div className="flex gap-5">
@@ -981,7 +1064,7 @@ export default function BookGeneratorPage() {
               </div>
 
               {/* Bottom CTA */}
-              {imagesReady && (
+              {result && (
                 <div className="flex flex-wrap justify-center gap-3 pt-2 pb-4">
                   <div
                     role="button"
