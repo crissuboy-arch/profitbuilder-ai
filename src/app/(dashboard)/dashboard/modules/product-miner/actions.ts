@@ -20,6 +20,9 @@ export type ProductIdea = {
   recommendedPlatforms: string[]; // ["Hotmart", "Kiwify"]
   recommendedFormat:    string;   // detailed format description
   marketTrend:          string;   // why it's trending NOW
+  // Deep Search enrichment (present only in web mode)
+  dataSource?:          "web" | "ai";
+  webSources?:          { title: string; url: string }[];
 };
 
 export type GenerateProductsParams = {

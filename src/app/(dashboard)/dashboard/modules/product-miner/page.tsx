@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   Loader2, PlusCircle, Search, Sparkles, CheckCircle2, Save,
   Users, Zap, TrendingUp, ArrowRight, BarChart2, Package2,
-  ExternalLink,
+  ExternalLink, Globe, Wifi,
 } from "lucide-react";
 
 // ── Output language options (for AI content, separate from UI language) ────────
@@ -75,6 +75,7 @@ export default function ProductMinerPage() {
   const [results, setResults]             = useState<ProductIdea[]>([]);
   const [currentProjectName, setCurrentProjectName] = useState("");
   const [outputLang, setOutputLang]       = useState("Português (PT-BR)");
+  const [deepSearch, setDeepSearch]       = useState(false);
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -99,13 +100,33 @@ export default function ProductMinerPage() {
       targetGoal:     fd.get("targetGoal")     as string,
     };
 
-    const { success, data, error } = await generateProducts(params);
-
-    if (success && data) {
-      setResults(data);
-      toast.success(`${data.length} ${t("pm.results.count")} ✓`);
+    if (deepSearch) {
+      // ── Deep Search via API route ────────────────────────────────────────
+      try {
+        const resp = await fetch("/api/deep-search", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify(params),
+        });
+        const json = await resp.json();
+        if (json.success && json.data) {
+          setResults(json.data);
+          toast.success(`${json.data.length} ${t("pm.ds.results.count")} ✓`);
+        } else {
+          toast.error(json.error || "Deep search failed.");
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Network error.");
+      }
     } else {
-      toast.error(error || "Failed to generate ideas.");
+      // ── Standard AI generation ───────────────────────────────────────────
+      const { success, data, error } = await generateProducts(params);
+      if (success && data) {
+        setResults(data);
+        toast.success(`${data.length} ${t("pm.results.count")} ✓`);
+      } else {
+        toast.error(error || "Failed to generate ideas.");
+      }
     }
 
     setLoading(false);
@@ -287,15 +308,71 @@ export default function ProductMinerPage() {
                   </div>
                 </div>
 
+                {/* ── Deep Search toggle ────────────────────────────────────── */}
+                <button
+                  type="button"
+                  onClick={() => setDeepSearch((v) => !v)}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 text-left",
+                    deepSearch
+                      ? "bg-[#00d4aa]/10 border-[#00d4aa]/40"
+                      : "bg-white/5 border-border/40 hover:border-border/70"
+                  )}
+                >
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                    deepSearch ? "bg-[#00d4aa]/20" : "bg-white/10"
+                  )}>
+                    <Wifi className={cn("w-4 h-4", deepSearch ? "text-[#00d4aa]" : "text-muted-foreground")} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "text-xs font-bold",
+                        deepSearch ? "text-[#00d4aa]" : "text-foreground"
+                      )}>
+                        {t("pm.ds.label")}
+                      </span>
+                      {deepSearch && (
+                        <span className="text-[10px] font-bold bg-[#00d4aa]/20 text-[#00d4aa] px-1.5 py-0.5 rounded-full">
+                          ON
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                      {t("pm.ds.desc")}
+                    </p>
+                  </div>
+                  {/* Toggle pill */}
+                  <div className={cn(
+                    "w-10 h-5 rounded-full transition-colors duration-200 relative shrink-0",
+                    deepSearch ? "bg-[#00d4aa]" : "bg-border"
+                  )}>
+                    <div className={cn(
+                      "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200",
+                      deepSearch ? "left-5" : "left-0.5"
+                    )} />
+                  </div>
+                </button>
+
                 <Button
                   type="submit"
                   className="w-full btn-cta font-semibold rounded-xl py-5"
                   disabled={loading}
                 >
                   {loading ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("pm.form.mining")}</>
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {deepSearch ? t("pm.ds.loading") : t("pm.form.mining")}
+                    </>
                   ) : (
-                    <><Sparkles className="mr-2 h-4 w-4" />{t("pm.form.generate")}</>
+                    <>
+                      {deepSearch
+                        ? <Globe className="mr-2 h-4 w-4" />
+                        : <Sparkles className="mr-2 h-4 w-4" />
+                      }
+                      {t("pm.form.generate")}
+                    </>
                   )}
                 </Button>
               </form>
@@ -322,12 +399,30 @@ export default function ProductMinerPage() {
 
           {/* Loading state */}
           {loading && (
-            <div className="flex flex-col items-center justify-center h-[520px] rounded-2xl border-2 border-dashed border-violet-500/20 bg-violet-500/5">
-              <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mb-5">
-                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+            <div className={cn(
+              "flex flex-col items-center justify-center h-[520px] rounded-2xl border-2 border-dashed",
+              deepSearch
+                ? "border-[#00d4aa]/20 bg-[#00d4aa]/5"
+                : "border-violet-500/20 bg-violet-500/5"
+            )}>
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center mb-5",
+                deepSearch ? "bg-[#00d4aa]/10" : "bg-violet-500/10"
+              )}>
+                {deepSearch
+                  ? <Globe className="w-8 h-8 text-[#00d4aa] animate-pulse" />
+                  : <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                }
               </div>
-              <h3 className="text-base font-bold animate-pulse">{t("pm.loading.title")}</h3>
-              <p className="text-muted-foreground text-sm mt-2">{t("pm.loading.desc")}</p>
+              <h3 className="text-base font-bold animate-pulse">
+                {deepSearch ? t("pm.ds.loading") : t("pm.loading.title")}
+              </h3>
+              <p className="text-muted-foreground text-sm mt-2">
+                {deepSearch
+                  ? "Tavily → OpenAI synthesis"
+                  : t("pm.loading.desc")
+                }
+              </p>
             </div>
           )}
 
@@ -339,11 +434,23 @@ export default function ProductMinerPage() {
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[#00d4aa]" />
                   <span className="text-sm font-semibold">
-                    {results.length} {t("pm.results.count")}
+                    {results.length}{" "}
+                    {results[0]?.dataSource === "web"
+                      ? t("pm.ds.results.count")
+                      : t("pm.results.count")
+                    }
                   </span>
-                  <span className="text-xs bg-violet-500/15 text-violet-400 px-2 py-0.5 rounded-full border border-violet-500/20">
-                    {outputLang.split(" ")[0]}
-                  </span>
+                  {/* Mode badge */}
+                  {results[0]?.dataSource === "web" ? (
+                    <span className="flex items-center gap-1 text-[10px] font-bold bg-[#00d4aa]/15 text-[#00d4aa] px-2 py-0.5 rounded-full border border-[#00d4aa]/25">
+                      <Wifi className="w-2.5 h-2.5" />
+                      {t("pm.ds.badge.web")}
+                    </span>
+                  ) : (
+                    <span className="text-xs bg-violet-500/15 text-violet-400 px-2 py-0.5 rounded-full border border-violet-500/20">
+                      {outputLang.split(" ")[0]}
+                    </span>
+                  )}
                 </div>
                 <Button
                   onClick={handleSaveAll}
@@ -358,7 +465,8 @@ export default function ProductMinerPage() {
               {/* Cards grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {results.map((product, index) => {
-                  const compStyle = competitionStyle(product.competitionLevel as CompetitionLevel);
+                  const compStyle  = competitionStyle(product.competitionLevel as CompetitionLevel);
+                  const isWebData  = product.dataSource === "web";
 
                   return (
                     <Card
@@ -366,12 +474,31 @@ export default function ProductMinerPage() {
                       className="flex flex-col rounded-2xl glass card-premium border border-border/50 hover:border-violet-500/30 transition-all duration-200 overflow-hidden"
                     >
                       {/* Top accent bar */}
-                      <div className="h-0.5 w-full bg-gradient-to-r from-violet-500 via-[#00d4aa] to-purple-500" />
+                      <div className={cn(
+                        "h-0.5 w-full",
+                        isWebData
+                          ? "bg-gradient-to-r from-[#00d4aa] via-teal-400 to-[#00d4aa]"
+                          : "bg-gradient-to-r from-violet-500 via-[#00d4aa] to-purple-500"
+                      )} />
 
                       {/* Header */}
                       <CardHeader className="pb-2 px-5 pt-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {/* Data source badge */}
+                              {isWebData ? (
+                                <span className="flex items-center gap-1 text-[9px] font-bold bg-[#00d4aa]/15 text-[#00d4aa] px-1.5 py-0.5 rounded-full border border-[#00d4aa]/25 shrink-0">
+                                  <Wifi className="w-2 h-2" />
+                                  {t("pm.ds.badge.web")}
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-[9px] font-bold bg-violet-500/15 text-violet-400 px-1.5 py-0.5 rounded-full border border-violet-500/20 shrink-0">
+                                  <Sparkles className="w-2 h-2" />
+                                  {t("pm.ds.badge.ai")}
+                                </span>
+                              )}
+                            </div>
                             <CardTitle className="text-base font-bold leading-snug line-clamp-2">
                               {product.productName}
                             </CardTitle>
@@ -479,6 +606,30 @@ export default function ProductMinerPage() {
                                 >
                                   {p}
                                 </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Web sources (only for deep search results) */}
+                        {isWebData && product.webSources && product.webSources.length > 0 && (
+                          <div className="pt-1">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                              <Globe className="w-3 h-3 text-[#00d4aa]" />
+                              {t("pm.ds.sources")}
+                            </p>
+                            <div className="space-y-1">
+                              {product.webSources.slice(0, 3).map((src, i) => (
+                                <a
+                                  key={i}
+                                  href={src.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 text-[10px] text-[#00d4aa]/80 hover:text-[#00d4aa] transition-colors group"
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-60 group-hover:opacity-100" />
+                                  <span className="truncate">{src.title}</span>
+                                </a>
                               ))}
                             </div>
                           </div>
