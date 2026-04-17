@@ -144,9 +144,9 @@ function buildCaption(caption: string, hashtags: string[]): string {
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const postId = params.id;
+  const { id: postId } = await params;
   if (!postId) return NextResponse.json({ error: "Post ID obrigatório" }, { status: 400 });
 
   const supabase = await createClient();

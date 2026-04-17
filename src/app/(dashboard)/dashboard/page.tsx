@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   BarChart, BarChart3, Lightbulb, Megaphone, Package, PenTool, Search,
   ShoppingCart, Wand2, ArrowRight, BookOpen, Users,
-  Layers, TrendingUp, Zap,
+  Layers, TrendingUp, Zap, Zap as ZapIcon,
 } from "lucide-react";
 
 const TOOLS = [
@@ -112,6 +112,16 @@ const TOOLS = [
     border:   "group-hover:border-indigo-400/30",
     href:     "/dashboard/modules/book-generator",
     badge:    true,
+  },
+  {
+    key:      "nav.marketingMachine",
+    desc_en:  "Generate complete marketing assets automatically.",
+    desc_pt:  "Gere todos os assets de marketing automaticamente.",
+    icon:     Zap,
+    color:    "text-teal-400",
+    bg:       "bg-teal-400/10",
+    border:   "group-hover:border-teal-400/30",
+    href:     "/dashboard/modules/marketing-machine",
   },
   {
     key:      "nav.squads",

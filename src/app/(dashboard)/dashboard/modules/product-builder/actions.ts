@@ -355,7 +355,7 @@ export async function generateCoverImage(params: {
       n: 1,
     });
 
-    const imageBase64 = response.data[0].b64_json;
+    const imageBase64 = response.data?.[0]?.b64_json;
     return { success: true, imageBase64 };
   } catch (error: any) {
     console.error("Error generating cover image:", error);

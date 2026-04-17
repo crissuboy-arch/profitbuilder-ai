@@ -45,7 +45,7 @@ function parseAgentMd(content: string, squadId: string, filename: string): Agent
   const titleMatch = content.match(/title:\s*["']?([^\n"']+)["']?/);
   const title = titleMatch ? titleMatch[1].trim() : undefined;
 
-  const whenToUseMatch = content.match(/whenToUse:\s*["']([^"']+)["']/s);
+  const whenToUseMatch = content.match(/whenToUse:\s*["']([^"']+)["']/m);
   const whenToUse = whenToUseMatch ? whenToUseMatch[1].trim() : undefined;
 
   return { id, name, squad: squadId, icon, title, whenToUse, content };

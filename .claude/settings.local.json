@@ -7,7 +7,8 @@
       "Bash(curl -s \"https://api.github.com/users/crissuboy-arch/repos\")",
       "Read(//c/tmp/**)",
       "Bash(unzip -o \"/c/Users/Evand/Downloads/xquads-squads-main.zip\" -d xquads)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

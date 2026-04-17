@@ -20,6 +20,7 @@ import {
   Folder,
   Users,
   Sparkles,
+  Zap,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -107,6 +108,13 @@ const NAV_ITEMS = [
     color: "text-indigo-400",
     badge: true,
     glow:  "group-hover:drop-shadow-[0_0_6px_rgb(129,140,248)]",
+  },
+  {
+    key:   "nav.marketingMachine",
+    icon:  Zap,
+    href:  "/dashboard/modules/marketing-machine",
+    color: "text-teal-400",
+    glow:  "group-hover:drop-shadow-[0_0_6px_rgb(45,212,191)]",
   },
   {
     key:   "nav.socialPublisher",
