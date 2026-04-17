@@ -6,12 +6,14 @@ import {
   improveBookFromText,
   generateBookCover,
   generateChapterImage,
-  saveBookToProject,
+  saveBook,
   savePlaybook,
+  generatePublicationKit,
   type BookResult,
   type BookBlock,
   type BookChapter,
   type ImproveMode,
+  type PublicationKit,
 } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +25,10 @@ import {
   BookOpen, Loader2, CheckCircle2, Save, FileDown, ChevronDown, ChevronUp,
   Image as ImageIcon, Upload, FileText, ChevronLeft, ChevronRight,
   BookMarked, Sparkles, X, Share2, Copy, Check, RefreshCw, Camera,
+  Library, ExternalLink, Package, CheckSquare,
+  Copy as CopyIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -45,6 +50,25 @@ const GENRE_OPTIONS = [
   { value: "Fantasia",           label: "Fantasia" },
   { value: "Autoajuda",          label: "Autoajuda" },
   { value: "Contos",             label: "Contos" },
+  { value: "Emagrecimento",      label: "Emagrecimento" },
+  { value: "Dieta e Nutrição",   label: "Dieta e Nutrição" },
+  { value: "Fitness",            label: "Fitness" },
+  { value: "Gospel/Cristão",     label: "Gospel/Cristão" },
+  { value: "Marketing Digital",   label: "Marketing Digital" },
+  { value: "Finanças",           label: "Finanças" },
+  { value: "Maternidade",        label: "Maternidade" },
+  { value: "Autodesenvolvimento", label: "Autodesenvolvimento" },
+  { value: "Negócios",           label: "Negócios" },
+  { value: "Culinária",          label: "Culinária" },
+  { value: "Infantil",           label: "Infantil" },
+  { value: "Juvenil",            label: "Juvenil" },
+  { value: "Biografia",          label: "Biografia" },
+  { value: "Motivacional",       label: "Motivacional" },
+  { value: "Espiritualidade",    label: "Espiritualidade" },
+  { value: "Relacionamentos",    label: "Relacionamentos" },
+  { value: "Educação",           label: "Educação" },
+  { value: "História",           label: "História" },
+  { value: "Tecnologia",         label: "Tecnologia" },
 ];
 
 const PAGE_SIZES = [10, 20, 30, 60, 80, 120];
@@ -59,10 +83,29 @@ const GENRE_COLORS: Record<string, { bg: string; text: string; badge: string }> 
   Fantasia:             { bg: "bg-violet-50",      text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
   Autoajuda:            { bg: "bg-amber-50",       text: "text-amber-700",   badge: "bg-amber-100 text-amber-700" },
   Contos:               { bg: "bg-emerald-50",     text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
+  Emagrecimento:        { bg: "bg-green-50",       text: "text-green-700",   badge: "bg-green-100 text-green-700" },
+  "Dieta e Nutrição":   { bg: "bg-lime-50",       text: "text-lime-700",   badge: "bg-lime-100 text-lime-700" },
+  Fitness:              { bg: "bg-orange-50",      text: "text-orange-700",  badge: "bg-orange-100 text-orange-700" },
+  "Gospel/Cristão":     { bg: "bg-yellow-50",      text: "text-yellow-700",  badge: "bg-yellow-100 text-yellow-700" },
+  "Marketing Digital":   { bg: "bg-blue-50",       text: "text-blue-700",    badge: "bg-blue-100 text-blue-700" },
+  Finanças:             { bg: "bg-emerald-50",    text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" },
+  Maternidade:          { bg: "bg-pink-50",       text: "text-pink-700",    badge: "bg-pink-100 text-pink-700" },
+  Autodesenvolvimento:  { bg: "bg-indigo-50",     text: "text-indigo-700",  badge: "bg-indigo-100 text-indigo-700" },
+  Negócios:             { bg: "bg-slate-50",      text: "text-slate-700",   badge: "bg-slate-100 text-slate-700" },
+  Culinária:            { bg: "bg-amber-50",      text: "text-amber-700",   badge: "bg-amber-100 text-amber-700" },
+  Infantil:             { bg: "bg-rainbow",        text: "text-slate-700",   badge: "bg-pink-100 text-pink-700" },
+  Juvenil:              { bg: "bg-cyan-50",        text: "text-cyan-700",    badge: "bg-cyan-100 text-cyan-700" },
+  Biografia:            { bg: "bg-stone-50",      text: "text-stone-700",   badge: "bg-stone-100 text-stone-700" },
+  Motivacional:         { bg: "bg-yellow-50",     text: "text-yellow-700",  badge: "bg-yellow-100 text-yellow-700" },
+  Espiritualidade:      { bg: "bg-violet-50",     text: "text-violet-700",  badge: "bg-violet-100 text-violet-700" },
+  Relacionamentos:       { bg: "bg-rose-50",       text: "text-rose-700",    badge: "bg-rose-100 text-rose-700" },
+  Educação:             { bg: "bg-blue-50",       text: "text-blue-700",    badge: "bg-blue-100 text-blue-700" },
+  História:             { bg: "bg-stone-50",      text: "text-stone-800",   badge: "bg-stone-200 text-stone-800" },
+  Tecnologia:           { bg: "bg-sky-50",        text: "text-sky-700",    badge: "bg-sky-100 text-sky-700" },
 };
 
 type AppMode  = "create" | "improve" | "rewrite";
-type ViewMode = "book" | "playbook";
+type ViewMode = "book" | "playbook" | "kit";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -98,6 +141,11 @@ export default function BookGeneratorPage() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareUrl, setShareUrl]         = useState<string | null>(null);
   const [copied, setCopied]             = useState(false);
+
+  // Kit de Publicação
+  const [kitLoading, setKitLoading] = useState(false);
+  const [publicationKit, setPublicationKit] = useState<PublicationKit | null>(null);
+  const [activeKitTab, setActiveKitTab] = useState<"amazon" | "hotmart" | "kiwify" | "eduzz" | "gumroad">("amazon");
 
   // Images
   const [coverBase64, setCoverBase64]     = useState<string | null>(null);
@@ -220,13 +268,16 @@ export default function BookGeneratorPage() {
   async function handleSave() {
     if (!result) return;
     setSaveLoading(true);
-    toast.loading("Salvando no projeto...", { id: "save-book" });
+    toast.loading("Salvando livro...", { id: "save-book" });
     try {
-      const { success, message, error } = await saveBookToProject(
+      const { success, error } = await saveBook({
         result,
-        `${result.title.substring(0, 40)} — Livro`
-      );
-      if (success) toast.success(message ?? "Salvo!", { id: "save-book" });
+        language,
+        genre,
+        pageSize,
+        authorName,
+      });
+      if (success) toast.success("Livro salvo em Meus Livros!", { id: "save-book" });
       else toast.error(error ?? "Falha ao salvar.", { id: "save-book" });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Falha ao salvar.", { id: "save-book" });
@@ -320,6 +371,39 @@ export default function BookGeneratorPage() {
     setShareLoading(false);
   }
 
+  // ── Kit de Publicação ───────────────────────────────────────────────────────
+
+  async function handleGenerateKit() {
+    if (!result) return;
+    setKitLoading(true);
+    toast.loading("Gerando kit de publicação...", { id: "kit" });
+    try {
+      const { success, data, error } = await generatePublicationKit(
+        result.title,
+        result.subtitle,
+        result.synopsis,
+        genre,
+        language,
+        authorName
+      );
+      if (success && data) {
+        setPublicationKit(data);
+        toast.success("Kit de publicação gerado!", { id: "kit" });
+      } else {
+        toast.error(error ?? "Erro ao gerar kit.", { id: "kit" });
+      }
+    } catch (err) {
+      console.error("Kit generation error:", err);
+      toast.error("Erro ao gerar kit de publicação.", { id: "kit" });
+    }
+    setKitLoading(false);
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    toast.success("Copiado!");
+  }
+
   // ── PDF generation ─────────────────────────────────────────────────────────
 
   async function handleDownloadPDF() {
@@ -331,9 +415,10 @@ export default function BookGeneratorPage() {
       const PW = 148, PH = 210, ML = 18, MT = 18, MR = 18;
       const W  = PW - ML - MR;
       const NAVY: [number, number, number]  = [30, 30, 100];
-      const GRAY: [number, number, number]  = [150, 150, 150];
+      const GOLD: [number, number, number]  = [180, 140, 60];
+      const GRAY: [number, number, number]  = [120, 120, 140];
       const WHITE: [number, number, number] = [255, 255, 255];
-      const DARK: [number, number, number]  = [20, 20, 60];
+      const DARK: [number, number, number]  = [20, 20, 50];
       let pageNum = 1;
 
       const setColor = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
@@ -377,106 +462,288 @@ export default function BookGeneratorPage() {
         return y;
       };
 
-      // ── Cover ──────────────────────────────────────────────────────────────
+      const displayAuthor = authorName || result.author;
+
+      // ── Cover Page ──────────────────────────────────────────────────────────
       if (coverBase64) {
         doc.addImage(coverBase64, "PNG", 0, 0, PW, PH);
+        // Add subtle text overlay area at bottom
         doc.saveGraphicsState();
-        doc.setGState(new GState({ opacity: 0.55 }));
-        doc.setFillColor(10, 10, 40);
-        doc.rect(0, PH * 0.55, PW, PH * 0.45, "F");
+        doc.setGState(new GState({ opacity: 0.7 }));
+        doc.setFillColor(10, 10, 50);
+        doc.rect(0, PH * 0.65, PW, PH * 0.35, "F");
         doc.restoreGraphicsState();
       } else {
         doc.setFillColor(...DARK);
         doc.rect(0, 0, PW, PH, "F");
         doc.setFillColor(255, 255, 255);
-        doc.rect(0, PH * 0.6, PW, PH * 0.4, "F");
+        doc.rect(0, PH * 0.55, PW, PH * 0.45, "F");
       }
 
       // Title
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
+      doc.setFontSize(18);
       setColor(...WHITE);
-      let y = 26;
+      let y = 25;
       for (const tl of doc.splitTextToSize(result.title, W)) {
         doc.text(tl, PW / 2, y, { align: "center" });
-        y += 12;
+        y += 10;
       }
 
       // Subtitle
       if (result.subtitle) {
         doc.setFont("helvetica", "italic");
-        doc.setFontSize(11);
+        doc.setFontSize(9);
+        setColor(...WHITE);
         for (const sl of doc.splitTextToSize(result.subtitle.split(".")[0], W)) {
           doc.text(sl, PW / 2, y, { align: "center" });
-          y += 7;
+          y += 5;
         }
       }
 
-      // Author on cover — prominent
-      const displayAuthor = authorName || result.author;
+      // Author
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      setColor(...WHITE);
-      doc.text(displayAuthor, PW / 2, PH - 20, { align: "center" });
+      doc.setFontSize(11);
+      setColor(...GOLD);
+      doc.text(displayAuthor, PW / 2, PH - 35, { align: "center" });
+
+      // Genre tag
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      setColor(...GRAY);
+      doc.text(genre.toUpperCase(), PW / 2, PH - 27, { align: "center" });
       resetColor();
+
+      // ── Back Cover Page ────────────────────────────────────────────────────
+      newPage();
+      pageNum--; // Don't count back cover as a page number
+
+      // Back cover background
+      doc.setFillColor(...DARK);
+      doc.rect(0, 0, PW, PH, "F");
+      
+      // Top decorative line
+      doc.setDrawColor(...GOLD);
+      doc.setLineWidth(0.5);
+      doc.line(ML, 20, PW - ML, 20);
+
+      // Back cover header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      setColor(...GOLD);
+      doc.text("CONTRACAPA", PW / 2, 28, { align: "center" });
+
+      // Book title on back
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      setColor(...WHITE);
+      let by = 42;
+      for (const tl of doc.splitTextToSize(result.title, W)) {
+        doc.text(tl, PW / 2, by, { align: "center" });
+        by += 8;
+      }
+
+      // Impact phrase
+      if (result.impactPhrase) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(10);
+        setColor(...GOLD);
+        by += 4;
+        const impactLines = doc.splitTextToSize(`"${result.impactPhrase}"`, W - 10);
+        for (const il of impactLines) {
+          doc.text(il, PW / 2, by, { align: "center" });
+          by += 6;
+        }
+      }
+
+      // Synopsis on back cover
+      by += 6;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      setColor(...WHITE);
+      const synopsisLines = doc.splitTextToSize(result.synopsis, W);
+      for (const sl of synopsisLines) {
+        if (by > PH - 40) break;
+        doc.text(sl, ML, by, { align: "left" });
+        by += 5;
+      }
+
+      // Bottom decorative line
+      doc.setDrawColor(...GOLD);
+      doc.setLineWidth(0.5);
+      doc.line(ML, PH - 30, PW - ML, PH - 30);
+
+      // Author credit
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      setColor(...GRAY);
+      doc.text(`por ${displayAuthor}`, PW / 2, PH - 22, { align: "center" });
+      doc.text("ProfitBuilder AI", PW / 2, PH - 16, { align: "center" });
+      resetColor();
+
+      // ── Table of Contents Page ──────────────────────────────────────────────
+      newPage();
+
+      // TOC header
+      doc.setFillColor(...NAVY);
+      doc.rect(0, 0, PW, 40, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      setColor(...WHITE);
+      doc.text("SUMÁRIO", PW / 2, 20, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      setColor(...GOLD);
+      doc.text(result.title, PW / 2, 30, { align: "center" });
+
+      // TOC content
+      let ty = 55;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      setColor(...NAVY);
+      doc.text("CAPÍTULOS", ML, ty);
+      ty += 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      setColor(...DARK);
+
+      for (const ch of result.chapters) {
+        if (ty > PH - 20) { newPage(); ty = MT + 10; }
+        
+        // Chapter number
+        doc.setFont("helvetica", "bold");
+        setColor(...NAVY);
+        doc.text(`${ch.number}.`, ML, ty);
+        
+        // Chapter title
+        doc.setFont("helvetica", "normal");
+        setColor(...DARK);
+        const titleText = ch.title.length > 40 ? ch.title.substring(0, 40) + "..." : ch.title;
+        doc.text(titleText, ML + 10, ty);
+        
+        // Dots
+        const dotX = ML + 10 + doc.getTextWidth(titleText) + 2;
+        const endX = PW - ML - 15;
+        if (dotX < endX) {
+          const dotCount = Math.floor((endX - dotX) / 2);
+          doc.setTextColor(...GRAY);
+          doc.text(".".repeat(Math.max(0, dotCount)), dotX, ty);
+        }
+        
+        ty += 7;
+      }
+
+      // Conclusion entry
+      if (result.conclusion) {
+        if (ty > PH - 20) { newPage(); ty = MT + 10; }
+        doc.setFont("helvetica", "bold");
+        setColor(...NAVY);
+        doc.text("→", ML, ty);
+        doc.setFont("helvetica", "normal");
+        setColor(...DARK);
+        doc.text(result.conclusion.title || "Conclusão", ML + 10, ty);
+        ty += 7;
+      }
+
+      // Bottom decorative element
+      ty += 10;
+      doc.setDrawColor(...GOLD);
+      doc.setLineWidth(0.3);
+      doc.line(ML, ty, PW - ML, ty);
 
       // ── Chapter pages ──────────────────────────────────────────────────────
       for (const ch of result.chapters) {
         newPage();
         let cy = MT + 8;
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        setColor(...NAVY);
-        doc.text(`Capítulo ${ch.number}`, PW / 2, cy, { align: "center" });
-        cy += 8;
+        // Chapter header box
+        doc.setFillColor(...NAVY);
+        doc.roundedRect(ML, cy - 4, W, 30, 2, 2, "F");
 
-        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        setColor(...WHITE);
+        doc.text(`CAPÍTULO ${ch.number}`, PW / 2, cy + 6, { align: "center" });
+
+        doc.setFontSize(10);
         for (const tl of doc.splitTextToSize(ch.title, W)) {
-          doc.text(tl, PW / 2, cy, { align: "center" });
-          cy += 7;
+          doc.text(tl, PW / 2, cy + 14, { align: "center" });
         }
 
-        cy += 3;
-        const lineStart = ML + W * 0.25;
-        doc.setDrawColor(...NAVY);
-        doc.setLineWidth(0.4);
-        doc.line(lineStart, cy, lineStart + W * 0.5, cy);
-        cy += 6;
+        cy += 32;
 
+        // Decorative line
+        doc.setDrawColor(...GOLD);
+        doc.setLineWidth(0.3);
+        const lineStart = ML + W * 0.25;
+        doc.line(lineStart, cy, lineStart + W * 0.5, cy);
+        cy += 8;
+
+        // Chapter image
         const chImg = chapterImages[ch.number];
         if (chImg) {
           const imgH = W * (1024 / 1792);
           if (cy + imgH > PH - 22) { newPage(); cy = MT + 10; }
           doc.addImage(chImg, "PNG", ML, cy, W, imgH);
-          cy += imgH + 6;
+          cy += imgH + 8;
         }
 
         resetColor();
         for (const block of ch.blocks) {
           if (cy > PH - 22) { newPage(); cy = MT + 10; }
           if (block.type === "heading") {
-            cy += 3;
+            cy += 4;
             doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
             setColor(...NAVY);
-            cy = writeLines(block.text.toUpperCase(), ML, cy, W, 6);
+            doc.text(block.text.toUpperCase(), ML, cy, { align: "left" });
             resetColor();
-            cy += 1;
+            cy += 6;
           } else if (block.type === "bullet") {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             resetColor();
-            cy = writeLines(`\u2022  ${block.text}`, ML + 5, cy, W - 5, 5.5);
-            cy += 0.5;
+            cy = writeLines(`•  ${block.text}`, ML + 5, cy, W - 5, 5.5);
+            cy += 2;
           } else {
             doc.setFont("helvetica", "normal");
             doc.setFontSize(10);
             resetColor();
             cy = writeLines(block.text, ML, cy, W, 5.8);
-            cy += 2.5;
+            cy += 4;
           }
         }
+      }
+
+      // ── Conclusion Page ────────────────────────────────────────────────────
+      if (result.conclusion) {
+        newPage();
+
+        // Conclusion header
+        doc.setFillColor(...GOLD);
+        doc.roundedRect(ML, 15, W, 25, 2, 2, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        setColor(...DARK);
+        doc.text(result.conclusion.title || "CONCLUSÃO", PW / 2, 25, { align: "center" });
+
+        let concY = 50;
+        resetColor();
+        for (const block of result.conclusion.blocks) {
+          if (concY > PH - 22) { newPage(); concY = MT + 10; }
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(10);
+          resetColor();
+          concY = writeLines(block.text, ML, concY, W, 6);
+          concY += 6;
+        }
+
+        // Final decorative element
+        concY += 15;
+        doc.setDrawColor(...GOLD);
+        doc.setLineWidth(0.5);
+        doc.line(ML, concY, PW - ML, concY);
       }
 
       drawFooter();
@@ -648,20 +915,482 @@ export default function BookGeneratorPage() {
     );
   }
 
+  // ── Kit de Publicação view ────────────────────────────────────────────────
+  if (result && viewMode === "kit") {
+    const kitTabs = [
+      { id: "amazon", label: "Amazon KDP", icon: "🇺🇸", color: "bg-orange-500" },
+      { id: "hotmart", label: "Hotmart", icon: "🔥", color: "bg-red-500" },
+      { id: "kiwify", label: "Kiwify", icon: "💜", color: "bg-violet-500" },
+      { id: "eduzz", label: "Eduzz", icon: "💙", color: "bg-blue-500" },
+      { id: "gumroad", label: "Gumroad", icon: "🟡", color: "bg-yellow-500" },
+    ] as const;
+
+    return (
+      <div className="min-h-screen bg-slate-50">
+        {/* Top bar */}
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600/10 rounded-lg">
+                <Package className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="font-bold text-lg">Kit de Publicação</h2>
+                <p className="text-xs text-slate-500">{result.title}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setViewMode("book")}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Voltar
+              </Button>
+            </div>
+          </div>
+          {/* Tabs */}
+          <div className="max-w-7xl mx-auto px-6 flex gap-1 overflow-x-auto pb-3">
+            {kitTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveKitTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap",
+                  activeKitTab === tab.id
+                    ? "bg-indigo-600 text-white"
+                    : "bg-white text-slate-600 hover:bg-slate-100"
+                )}
+              >
+                <span>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          {!publicationKit ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="p-6 bg-indigo-100 rounded-2xl mb-6">
+                <Package className="w-12 h-12 text-indigo-600" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Preparar para Publicação</h3>
+              <p className="text-slate-500 text-center max-w-md mb-6">
+                Gere um kit completo com títulos otimizados, descrições, palavras-chave,
+                preços e checklists para publicar em todas as plataformas.
+              </p>
+              <Button
+                onClick={handleGenerateKit}
+                disabled={kitLoading}
+                className="bg-indigo-600 hover:bg-indigo-700 text-lg px-8 py-4"
+              >
+                {kitLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Gerando kit...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Gerar Kit de Publicação
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Active tab content */}
+              <Card className="border-none shadow-lg">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl">
+                      {kitTabs.find(t => t.id === activeKitTab)?.icon}{" "}
+                      {kitTabs.find(t => t.id === activeKitTab)?.label}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleGenerateKit}
+                      disabled={kitLoading}
+                    >
+                      <RefreshCw className={cn("w-4 h-4 mr-2", kitLoading && "animate-spin")} />
+                      Regenerar
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Amazon KDP */}
+                  {activeKitTab === "amazon" && publicationKit.amazon && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Título</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input value={publicationKit.amazon.title} readOnly className="font-medium" />
+                              <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.amazon!.title)}>
+                                <CopyIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Subtítulo</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input value={publicationKit.amazon.subtitle} readOnly />
+                              <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.amazon!.subtitle)}>
+                                <CopyIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Preço Sugerido</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-2xl font-bold text-green-600">
+                                USD {publicationKit.amazon.suggestedPriceUSD.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold text-slate-500 uppercase">Palavras-chave</Label>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {publicationKit.amazon.keywords.map((kw, i) => (
+                              <span key={i} className="px-3 py-1 bg-slate-100 rounded-full text-sm">
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="mt-4">
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Categorias</Label>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {publicationKit.amazon.categories.map((cat, i) => (
+                                <span key={i} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Descrição</Label>
+                        <div className="flex gap-2 mt-1">
+                          <textarea
+                            value={publicationKit.amazon.description}
+                            readOnly
+                            rows={8}
+                            className="w-full p-3 rounded-lg border bg-slate-50 text-sm"
+                          />
+                          <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.amazon!.description)}>
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="border-t pt-6">
+                        <h4 className="font-bold mb-4 flex items-center gap-2">
+                          <CheckSquare className="w-5 h-5 text-green-600" />
+                          Checklist Amazon KDP
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {publicationKit.amazon.kdpChecklist.map((item, i) => (
+                            <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                              <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                                <Check className="w-4 h-4 text-green-600" />
+                              </div>
+                              <span className="text-sm">{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 flex gap-3">
+                          <Button className="bg-orange-500 hover:bg-orange-600">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Publicar na Amazon KDP
+                          </Button>
+                          <Button variant="outline" onClick={() => copyToClipboard(publicationKit.amazon!.kdpChecklist.join("\n"))}>
+                            <CopyIcon className="w-4 h-4 mr-2" />
+                            Copiar Checklist
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hotmart */}
+                  {activeKitTab === "hotmart" && publicationKit.hotmart && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Título do Produto</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input value={publicationKit.hotmart.productTitle} readOnly className="font-medium" />
+                              <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.hotmart!.productTitle)}>
+                                <CopyIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Preço Sugerido</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-2xl font-bold text-green-600">
+                                R$ {publicationKit.hotmart.suggestedPriceBRL.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Descrição de Vendas</Label>
+                        <div className="flex gap-2 mt-1">
+                          <textarea
+                            value={publicationKit.hotmart.salesDescription}
+                            readOnly
+                            rows={6}
+                            className="w-full p-3 rounded-lg border bg-slate-50 text-sm"
+                          />
+                          <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.hotmart!.salesDescription)}>
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Página de Vendas</Label>
+                        <div className="flex gap-2 mt-1">
+                          <textarea
+                            value={publicationKit.hotmart.salesPageContent}
+                            readOnly
+                            rows={12}
+                            className="w-full p-3 rounded-lg border bg-slate-50 text-sm"
+                          />
+                          <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.hotmart!.salesPageContent)}>
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button className="bg-red-500 hover:bg-red-600">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Criar na Hotmart
+                          <span className="ml-2 text-xs opacity-75">
+                            {publicationKit.hotmart.registrationUrl.replace("https://www.", "")}
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kiwify */}
+                  {activeKitTab === "kiwify" && publicationKit.kiwify && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Título do Produto</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input value={publicationKit.kiwify.productTitle} readOnly className="font-medium" />
+                              <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.kiwify!.productTitle)}>
+                                <CopyIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Preço Sugerido</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-2xl font-bold text-green-600">
+                                R$ {publicationKit.kiwify.suggestedPriceBRL.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Descrição</Label>
+                        <div className="flex gap-2 mt-1">
+                          <textarea
+                            value={publicationKit.kiwify.description}
+                            readOnly
+                            rows={6}
+                            className="w-full p-3 rounded-lg border bg-slate-50 text-sm"
+                          />
+                          <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.kiwify!.description)}>
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Elementos de Vendas</Label>
+                        <div className="space-y-2 mt-2">
+                          {publicationKit.kiwify.salesElements.map((el, i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                              <div className="w-6 h-6 bg-violet-100 rounded-full flex items-center justify-center shrink-0 text-violet-600 font-bold text-sm">
+                                {i + 1}
+                              </div>
+                              <span className="text-sm">{el}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button className="bg-violet-500 hover:bg-violet-600">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Criar na Kiwify
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Eduzz */}
+                  {activeKitTab === "eduzz" && publicationKit.eduzz && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Título do Produto</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input value={publicationKit.eduzz.productTitle} readOnly className="font-medium" />
+                              <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.eduzz!.productTitle)}>
+                                <CopyIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Preço Sugerido</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-2xl font-bold text-green-600">
+                                R$ {publicationKit.eduzz.suggestedPriceBRL.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Descrição</Label>
+                        <div className="flex gap-2 mt-1">
+                          <textarea
+                            value={publicationKit.eduzz.description}
+                            readOnly
+                            rows={6}
+                            className="w-full p-3 rounded-lg border bg-slate-50 text-sm"
+                          />
+                          <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.eduzz!.description)}>
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Elementos de Vendas</Label>
+                        <div className="space-y-2 mt-2">
+                          {publicationKit.eduzz.salesElements.map((el, i) => (
+                            <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center shrink-0 text-blue-600 font-bold text-sm">
+                                {i + 1}
+                              </div>
+                              <span className="text-sm">{el}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button className="bg-blue-500 hover:bg-blue-600">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Criar na Eduzz
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gumroad */}
+                  {activeKitTab === "gumroad" && publicationKit.gumroad && (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Título do Produto</Label>
+                            <div className="flex gap-2 mt-1">
+                              <Input value={publicationKit.gumroad.productTitle} readOnly className="font-medium" />
+                              <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.gumroad!.productTitle)}>
+                                <CopyIcon className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold text-slate-500 uppercase">Preço Sugerido</Label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-2xl font-bold text-green-600">
+                                USD {publicationKit.gumroad.suggestedPriceUSD.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Descrição</Label>
+                        <div className="flex gap-2 mt-1">
+                          <textarea
+                            value={publicationKit.gumroad.description}
+                            readOnly
+                            rows={6}
+                            className="w-full p-3 rounded-lg border bg-slate-50 text-sm"
+                          />
+                          <Button variant="outline" size="icon" onClick={() => copyToClipboard(publicationKit.gumroad!.description)}>
+                            <CopyIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-500 uppercase">Dicas para Landing Page</Label>
+                        <div className="space-y-2 mt-2">
+                          {publicationKit.gumroad.landingPageTips.map((tip, i) => (
+                            <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                              <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center shrink-0 text-yellow-600 font-bold text-sm">
+                                {i + 1}
+                              </div>
+                              <span className="text-sm">{tip}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button className="bg-yellow-500 hover:bg-yellow-600">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Criar no Gumroad
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // ── Main layout ────────────────────────────────────────────────────────────
   return (
     <div className="p-8 max-w-7xl mx-auto">
       {/* Page header */}
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-indigo-600/10 rounded-xl">
-          <BookOpen className="w-8 h-8 text-indigo-600" />
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-indigo-600/10 rounded-xl">
+            <BookOpen className="w-8 h-8 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gerador de Livros</h1>
+            <p className="text-muted-foreground text-sm">
+              Story Chief + DALL-E 3 · PDF profissional B5 · Playbook interativo anime/mangá
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gerador de Livros</h1>
-          <p className="text-muted-foreground text-sm">
-            Story Chief + DALL-E 3 · PDF profissional B5 · Playbook interativo anime/mangá
-          </p>
-        </div>
+        <Link href="/dashboard/meus-livros">
+          <Button variant="outline" className="gap-2">
+            <Library className="w-4 h-4" />
+            Meus Livros
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
@@ -978,6 +1707,15 @@ export default function BookGeneratorPage() {
                       ? <Check className="w-3.5 h-3.5 mr-1.5 text-green-600" />
                       : <Share2 className="w-3.5 h-3.5 mr-1.5" />}
                     {copied ? "Copiado!" : "Compartilhar"}
+                  </Button>
+                  <Button
+                    onClick={() => setViewMode("kit")}
+                    variant="outline"
+                    size="sm"
+                    className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <Package className="w-3.5 h-3.5 mr-1.5" />
+                    Kit Pub.
                   </Button>
                   <Button
                     onClick={handleDownloadPDF}

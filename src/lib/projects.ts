@@ -1,10 +1,10 @@
 import { createClient } from "@/utils/supabase/server";
 
 /**
- * Ensures a project exists for the given user, returning its ID.
- * If one with this name does not exist, it creates a new one.
+ * Ensures a user exists in public.users table.
+ * Returns the user record or throws if not authenticated.
  */
-export async function getOrCreateProject(projectName: string): Promise<string> {
+async function ensureUserInDatabase(): Promise<{ id: string; email: string }> {
   const supabase = await createClient();
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -15,13 +15,38 @@ export async function getOrCreateProject(projectName: string): Promise<string> {
   const userId = authData.user.id;
   const userEmail = authData.user.email ?? `${userId}@user.com`;
 
-  // Ensure the user exists in public.users (FK required by projects table).
-  // The trigger on_auth_user_created handles this at sign-up, but may be missing
-  // for users created before the trigger was set up.
-  await supabase
+  const { data: existingUser } = await supabase
     .from("users")
-    .upsert({ id: userId, email: userEmail }, { onConflict: "id", ignoreDuplicates: true });
-  // Non-fatal: if RLS blocks the upsert the user row already exists.
+    .select("id, email")
+    .eq("id", userId)
+    .single();
+
+  if (existingUser) {
+    return existingUser;
+  }
+
+  const { data: upsertedUser, error: upsertError } = await supabase
+    .from("users")
+    .upsert({ id: userId, email: userEmail }, { onConflict: "id" })
+    .select("id, email")
+    .single();
+
+  if (upsertError) {
+    console.error("Error upserting user:", upsertError);
+    throw new Error("Falha ao criar perfil de usuário. Tente fazer login novamente.");
+  }
+
+  return upsertedUser!;
+}
+
+/**
+ * Ensures a project exists for the given user, returning its ID.
+ * If one with this name does not exist, it creates a new one.
+ */
+export async function getOrCreateProject(projectName: string): Promise<string> {
+  const supabase = await createClient();
+  const user = await ensureUserInDatabase();
+  const userId = user.id;
 
   // Check if project exists
   const { data: existingProject, error: fetchError } = await supabase
@@ -66,18 +91,16 @@ export async function saveGenerationToDatabase(
   outputData: any = {}
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
+    const user = await ensureUserInDatabase();
     const projectId = await getOrCreateProject(projectName);
     const supabase = await createClient();
-    
-    // Safety check again to get user_id (required by RLS)
-    const { data: { user } } = await supabase.auth.getUser();
 
     const { error } = await supabase
       .from("generations")
       .insert([
         {
           project_id: projectId,
-          user_id: user!.id,
+          user_id: user.id,
           module_type: moduleType,
           input_params: inputParams,
           output_data: outputData,
