@@ -106,6 +106,7 @@ const GENRE_COLORS: Record<string, { bg: string; text: string; badge: string }> 
 
 type AppMode  = "create" | "improve" | "rewrite";
 type ViewMode = "book" | "playbook" | "kit";
+type EbookStyle = "visual" | "traditional";  // Visual = Marketing (with images), Traditional = Amazon (clean)
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,7 @@ export default function BookGeneratorPage() {
   const [authorName, setAuthorName]   = useState("");
   const [pageSize, setPageSize]       = useState(60);
   const [playbookMode, setPlaybookMode] = useState(false);
+  const [ebookStyle, setEbookStyle] = useState<EbookStyle>("visual");  // Visual (marketing) vs Traditional (Amazon)
 
   // PDF upload
   const [pdfText, setPdfText]             = useState("");
@@ -240,23 +242,26 @@ export default function BookGeneratorPage() {
     setLoading(false);
     toast.success("Manuscrito gerado! Gerando imagens...");
 
-    const total = 1 + data.chapters.length;
+    const isVisual = ebookStyle === "visual";
+    const total = isVisual ? 1 + data.chapters.length : 1;
     setImgTotal(total);
 
     // Cover
-    setImgStep("Gerando capa profissional...");
+    setImgStep(isVisual ? "Gerando capa visual profissional..." : "Gerando capa limpa para Amazon KDP...");
     const coverRes = await generateBookCover(data.title, data.subtitle, data.author || authorName, genre);
     if (coverRes.success && coverRes.base64) setCoverBase64(coverRes.base64);
     setImgDone(1);
 
-    // Chapter images
-    for (const ch of data.chapters) {
-      setImgStep(`Gerando imagem — Capítulo ${ch.number}/${data.chapters.length}...`);
-      const imgRes = await generateChapterImage(ch.number, ch.title, ch.imageDesc, genre, playbookMode);
-      if (imgRes.success && imgRes.base64) {
-        setChapterImages(prev => ({ ...prev, [ch.number]: imgRes.base64! }));
+    // Chapter images — only for Ebook Visual mode
+    if (isVisual) {
+      for (const ch of data.chapters) {
+        setImgStep(`Gerando imagem — Capítulo ${ch.number}/${data.chapters.length}...`);
+        const imgRes = await generateChapterImage(ch.number, ch.title, ch.imageDesc, genre, playbookMode);
+        if (imgRes.success && imgRes.base64) {
+          setChapterImages(prev => ({ ...prev, [ch.number]: imgRes.base64! }));
+        }
+        setImgDone(prev => prev + 1);
       }
-      setImgDone(prev => prev + 1);
     }
 
     setImgStep("");
@@ -1403,6 +1408,98 @@ export default function BookGeneratorPage() {
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-5">
 
+              {/* ── Ebook Mode Selector ── */}
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Escolha o Modo</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setEbookStyle("visual")}
+                    onKeyDown={e => e.key === "Enter" && setEbookStyle("visual")}
+                    className={cn(
+                      "relative p-4 rounded-xl border-2 cursor-pointer transition select-none",
+                      ebookStyle === "visual"
+                        ? "border-teal-500 bg-teal-50"
+                        : "border-slate-200 hover:border-teal-300 bg-white"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "flex items-center justify-center w-10 h-10 rounded-xl shrink-0 text-lg",
+                        ebookStyle === "visual" ? "bg-teal-500 text-white" : "bg-slate-100 text-slate-500"
+                      )}>
+                        🎨
+                      </div>
+                      <div className="min-w-0">
+                        <div className={cn("font-bold text-sm", ebookStyle === "visual" ? "text-teal-700" : "text-slate-700")}>
+                          Modo A — Ebook Visual
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">Imagem DALL-E em cada capítulo · Capa premium · Design moderno</div>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {["Romance", "Infantil", "Fantasia", "Fitness", "Receitas"].map(tag => (
+                            <span key={tag} className={cn("text-xs px-1.5 py-0.5 rounded-full", ebookStyle === "visual" ? "bg-teal-100 text-teal-700" : "bg-slate-100 text-slate-500")}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {ebookStyle === "visual" && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-teal-500 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setEbookStyle("traditional")}
+                    onKeyDown={e => e.key === "Enter" && setEbookStyle("traditional")}
+                    className={cn(
+                      "relative p-4 rounded-xl border-2 cursor-pointer transition select-none",
+                      ebookStyle === "traditional"
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-slate-200 hover:border-blue-300 bg-white"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "flex items-center justify-center w-10 h-10 rounded-xl shrink-0 text-lg",
+                        ebookStyle === "traditional" ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-500"
+                      )}>
+                        📖
+                      </div>
+                      <div className="min-w-0">
+                        <div className={cn("font-bold text-sm", ebookStyle === "traditional" ? "text-blue-700" : "text-slate-700")}>
+                          Modo B — Livro Tradicional
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">Layout limpo Amazon KDP · Sem imagens nos capítulos · Índice + Conclusão</div>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {["Autoajuda", "Negócios", "Amazon KDP", "Educação", "Motivacional"].map(tag => (
+                            <span key={tag} className={cn("text-xs px-1.5 py-0.5 rounded-full", ebookStyle === "traditional" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500")}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {ebookStyle === "traditional" && (
+                        <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100" />
+
               {/* Mode selector */}
               <div className="space-y-1.5">
                 <Label>Modo</Label>
@@ -1669,10 +1766,13 @@ export default function BookGeneratorPage() {
                 <div className="flex items-center gap-2 text-indigo-600 font-medium text-sm">
                   <CheckCircle2 className="w-4 h-4" />
                   Manuscrito gerado
-                  {imageCount > 0 && (
+                  {ebookStyle === "visual" && imageCount > 0 && (
                     <span className="text-xs text-slate-400 font-normal">
                       · {imageCount}/{result.chapters.length} ilustrações{coverBase64 ? " + capa" : ""}
                     </span>
+                  )}
+                  {ebookStyle === "traditional" && coverBase64 && (
+                    <span className="text-xs text-slate-400 font-normal">· capa gerada</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1873,8 +1973,8 @@ export default function BookGeneratorPage() {
                       </div>
                       {isOpen && (
                         <CardContent className="pt-3 pb-5">
-                          {/* Chapter image + replace UI */}
-                          <div className="mb-4">
+                          {/* Chapter image + replace UI — only in Visual mode */}
+                          <div className={ebookStyle === "traditional" ? "hidden" : "mb-4"}>
                             {/* Preview pending upload */}
                             {pendingChapterImg?.num === ch.number ? (
                               <div className="space-y-2">
