@@ -506,7 +506,6 @@ export default function BookGeneratorPage() {
     </div>
   );
 
-  const imagesReady = imgTotal > 0 && imgDone >= imgTotal;
   const imageCount  = Object.keys(chapterImages).length;
 
   // ── Playbook view — full dark manga reader ─────────────────────────────────
@@ -698,9 +697,11 @@ export default function BookGeneratorPage() {
                   ))}
                 </div>
                 <p className="text-xs text-slate-400 px-0.5">
-                  {appMode === "create"   && "Cria um livro do zero a partir do tema."}
-                  {appMode === "improve"  && "Melhora um PDF existente mantendo o conteúdo."}
-                  {appMode === "rewrite"  && "Reescreve completamente um PDF no novo estilo."}
+                  {appMode === "create"
+                    ? "Cria um livro do zero a partir do tema."
+                    : appMode === "improve"
+                    ? "Melhora um PDF existente mantendo o conteúdo."
+                    : "Reescreve completamente um PDF no novo estilo."}
                 </p>
               </div>
 
@@ -896,7 +897,7 @@ export default function BookGeneratorPage() {
           {!result && !loading && (
             <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-slate-50/50">
               <BookOpen className="w-10 h-10 text-slate-300 mb-3" />
-              <h3 className="text-lg font-medium text-slate-600">Aguardando configurações</h3>
+              <p className="text-lg font-medium text-slate-600">Aguardando configurações</p>
               <p className="text-slate-400 text-sm mt-1 text-center max-w-xs">
                 Preencha as configurações e clique em &quot;Gerar&quot;
               </p>
@@ -907,9 +908,9 @@ export default function BookGeneratorPage() {
           {loading && (
             <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-indigo-50/30">
               <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-              <h3 className="text-lg font-medium text-slate-700 animate-pulse">
+              <p className="text-lg font-medium text-slate-700 animate-pulse">
                 {appMode === "create" ? "Escrevendo manuscrito..." : "Processando livro..."}
-              </h3>
+              </p>
               <p className="text-slate-400 text-sm mt-1">Story Chief + squad Storytelling em ação</p>
             </div>
           )}
@@ -1068,7 +1069,7 @@ export default function BookGeneratorPage() {
                 <Card className={`flex-1 border-none shadow-md ${colors.bg}`}>
                   <CardContent className="pt-5 pb-5">
                     <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${colors.text}`}>{genre}</p>
-                    <h2 className={`text-2xl font-black tracking-tight ${colors.text}`}>{result.title}</h2>
+                    <p className={`text-2xl font-black tracking-tight ${colors.text}`}>{result.title}</p>
                     {result.subtitle && (
                       <p className={`text-sm mt-1 italic ${colors.text} opacity-80`}>{result.subtitle}</p>
                     )}
@@ -1096,9 +1097,9 @@ export default function BookGeneratorPage() {
 
               {/* Chapters accordion */}
               <div className="space-y-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
                   {result.chapters.length} Capítulos
-                </h3>
+                </p>
                 {result.chapters.map((ch) => {
                   const isOpen = expandedChapter === ch.number;
                   const hasImg = !!chapterImages[ch.number];
@@ -1163,7 +1164,7 @@ export default function BookGeneratorPage() {
                                 </div>
                               </div>
                             ) : (
-                              <>
+                              <div>
                                 {chapterImages[ch.number] && (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -1213,7 +1214,7 @@ export default function BookGeneratorPage() {
                                     <RefreshCw className="w-3 h-3" /> Trocar imagem
                                   </button>
                                 )}
-                              </>
+                              </div>
                             )}
                           </div>
                           {renderBlocks(ch.blocks)}
