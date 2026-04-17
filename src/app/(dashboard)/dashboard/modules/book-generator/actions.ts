@@ -160,14 +160,10 @@ Return ONLY a valid JSON object:
       "title": "Chapter title",
       "imageDesc": "Vivid visual scene for DALL-E 3. No text. Realistic/painterly. Max 120 words.",
       "blocks": [
-        {"type": "heading", "text": "Introdução"},
-        {"type": "paragraph", "text": "Opening hook — minimum ${Math.round(minWords * 0.2)} words"},
-        {"type": "heading", "text": "Desenvolvimento"},
-        {"type": "bullet", "text": "Key point or scene — fully written"},
-        {"type": "bullet", "text": "Second point or scene — fully written"},
-        {"type": "bullet", "text": "Third point with insight"},
-        {"type": "heading", "text": "Conclusão"},
-        {"type": "paragraph", "text": "Closing that connects to next chapter — minimum ${Math.round(minWords * 0.15)} words"}
+        {"type": "paragraph", "text": "Opening hook paragraph — minimum ${Math.round(minWords * 0.2)} words"},
+        {"type": "paragraph", "text": "Development paragraph — scene, tension, or character depth"},
+        {"type": "paragraph", "text": "Further development — rising action or emotional beat"},
+        {"type": "paragraph", "text": "Closing paragraph that flows into the next chapter — minimum ${Math.round(minWords * 0.15)} words"}
       ]
     }
   ]
@@ -176,7 +172,7 @@ Return ONLY a valid JSON object:
 ABSOLUTE RULES:
 1. ALL text in ${language} — never mix languages.
 2. EXACTLY ${chapters} chapters.
-3. Each chapter MUST have blocks: heading(Introdução)→paragraph→heading(Desenvolvimento)→3+ bullets→heading(Conclusão)→paragraph.
+3. Each chapter MUST have 4–6 blocks of type "paragraph" only — flowing prose like a professional novel. NO headings, NO bullets, NO structural labels (Introdução/Desenvolvimento/Conclusão or any section titles).
 4. "imageDesc" must be a vivid scene, NO text/letters.
 5. Return ONLY the JSON — no markdown fences.`;
 }
@@ -281,13 +277,13 @@ const COVER_STYLES: Record<string, string> = {
   Contos:
     "illustrated storybook style, whimsical, rich textures, warm colors, literary artistic aesthetic",
   "Romance de Mafia":
-    "Brazilian Dreame romance cover: brooding dark-haired mafia boss in expensive suit, dramatic chiaroscuro lighting, deep red and black palette, rose petals or gun as symbol, cinematic, luxury and danger combined, moody editorial photography",
+    "Brazilian Dreame romance cover: brooding dark-haired mafia boss in expensive suit, even professional studio lighting, deep red and charcoal palette, rose petals or gun as symbol, cinematic, luxury and danger combined, editorial photography, fully illuminated scene with no dark shadows",
   "CEO Romance":
-    "Brazilian Dreame CEO romance cover: tall attractive billionaire in tailored suit, city skyline at night or luxury penthouse, gold and navy palette, confident powerful stance, glamorous aspirational aesthetic, high-fashion editorial photography, warm bokeh city lights",
+    "Brazilian Dreame CEO romance cover: tall attractive billionaire in tailored suit, city skyline or luxury penthouse background, gold and navy palette, confident powerful stance, glamorous aspirational aesthetic, high-fashion editorial photography, bright even lighting throughout",
   "Dark Romance":
-    "Brazilian Dreame dark romance cover: dramatic contrast light and shadow, anti-hero with intense dangerous eyes, dark floral motifs — black roses and chains as ornamental elements, deep crimson and obsidian palette, gothic elegant aesthetic, tension and forbidden desire, cinematic dark fantasy photography",
+    "Brazilian Dreame dark romance cover: intense moody aesthetic, anti-hero with piercing eyes, dark floral motifs — black roses and chains as ornamental elements, deep crimson and charcoal palette, gothic elegant aesthetic, tension and forbidden desire, cinematic fantasy photography, evenly lit with professional studio lighting",
   "Suspense Romântico":
-    "Brazilian Dreame romantic suspense cover: couple in dangerous situation, thriller atmosphere with romantic tension, muted teal and burgundy palette, motion blur or dramatic silhouettes, urban noir setting, rain-slicked streets, sense of urgency and hidden desire, cinematic thriller poster",
+    "Brazilian Dreame romantic suspense cover: couple in dramatic situation, thriller atmosphere with romantic tension, teal and burgundy palette, dynamic silhouettes, urban noir setting, sense of urgency and hidden desire, cinematic thriller poster, bright even lighting with no dark vignette",
 };
 
 export async function generateBookCover(
@@ -297,8 +293,8 @@ export async function generateBookCover(
   genre: string
 ): Promise<{ success: boolean; base64?: string; error?: string }> {
   try {
-    const style = COVER_STYLES[genre] ?? "professional book cover, cinematic dramatic lighting";
-    const prompt = `Professional publishing-quality book cover for "${title}" by ${author}. Subtitle: "${subtitle}". Style: ${style}. Portrait orientation. Large clear space at top for title text, bottom for author name. No text, no letters, no words anywhere. High quality digital art.`;
+    const style = COVER_STYLES[genre] ?? "professional book cover, even studio lighting, vibrant colors";
+    const prompt = `Professional publishing-quality book cover for "${title}" by ${author}. Subtitle: "${subtitle}". Style: ${style}. Portrait orientation. Large clear space at top for title text, bottom for author name. No text, no letters, no words anywhere. High quality digital art. IMPORTANT: uniform bright lighting across the entire image, no dark gradients, no vignette, no shadow covering any portion of the image, fully illuminated composition.`;
 
     const resp = await openai.images.generate({
       model: "dall-e-3", prompt, n: 1, size: "1024x1792", quality: "hd",
