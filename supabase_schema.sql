@@ -130,7 +130,35 @@ create policy "Users can insert own playbooks." on public.playbooks
 create policy "Users can delete own playbooks." on public.playbooks
   for delete using (auth.uid() = user_id);
 
--- 7. Social Publisher tables
+-- 7. Books (Meus Livros — saved generated books, text-only, no images)
+create table if not exists public.books (
+  id            uuid default uuid_generate_v4() primary key,
+  user_id       uuid references auth.users(id) on delete cascade not null,
+  title         text not null,
+  subtitle      text not null default '',
+  author        text not null,
+  genre         text not null default 'Autoajuda',
+  language      text not null default 'Português',
+  synopsis      text,
+  impact_phrase text,
+  conclusion    jsonb,           -- { title, blocks[] }
+  chapters      jsonb not null default '[]',  -- BookChapter[] without imageBase64
+  page_size     integer default 60,
+  created_at    timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.books enable row level security;
+
+create policy "Users can view own books." on public.books
+  for select using (auth.uid() = user_id);
+
+create policy "Users can insert own books." on public.books
+  for insert with check (auth.uid() = user_id);
+
+create policy "Users can delete own books." on public.books
+  for delete using (auth.uid() = user_id);
+
+-- 8. Social Publisher tables
 
 -- Platform connections (Instagram, TikTok) per user
 create table public.sp_platforms (
