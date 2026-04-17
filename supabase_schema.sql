@@ -220,3 +220,28 @@ create policy "Users manage own sp_post_platforms." on public.sp_post_platforms
   with check (
     exists (select 1 from public.sp_posts where id = post_id and user_id = auth.uid())
   );
+
+-- 9. Saved Ads (for Ads Creator Pro)
+create table if not exists public.saved_ads (
+  id                uuid default uuid_generate_v4() primary key,
+  user_id          uuid references auth.users(id) on delete cascade not null,
+  product_name     text not null,
+  framework_id     text not null,
+  framework_name   text not null,
+  headline         text not null,
+  body             text not null,
+  cta              text not null,
+  visual_concept   text,
+  image_prompt     text,
+  hook_score       integer default 0,
+  clarity_score    integer default 0,
+  emotion_score    integer default 0,
+  conversion_score integer default 0,
+  final_score      integer default 0,
+  is_top_ad        boolean default false,
+  created_at       timestamptz default timezone('utc'::text, now()) not null
+);
+
+alter table public.saved_ads enable row level security;
+create policy "Users manage own saved_ads." on public.saved_ads
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

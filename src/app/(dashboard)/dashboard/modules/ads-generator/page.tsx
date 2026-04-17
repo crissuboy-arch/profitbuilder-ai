@@ -1,55 +1,75 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { 
-  generateAds, 
   generateFrameworkAds,
-  saveAdsToProject,
   saveFrameworkAdsToProject,
-  type AdsResult,
+  saveSingleAdToDatabase,
+  getSavedAds,
+  deleteSavedAd,
   type AdCreative
 } from "./actions";
-import { adFrameworks, FRAMEWORK_CATEGORIES, PSYCHOLOGICAL_TRIGGER_LABELS, type AdFramework } from "./adFrameworks";
+import { adFrameworks, FRAMEWORK_CATEGORIES, type AdFramework } from "./adFrameworks";
+import { getScoreBadge } from "./adScorer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
 import { LanguageSelect } from "@/components/shared/LanguageSelect";
 import { toast } from "sonner";
 import { 
   Loader2, 
   Megaphone, 
-  Video, 
-  Image as ImageIcon, 
   CheckCircle2, 
   Save, 
   MousePointerClick, 
-  AlignLeft, 
-  HeartPulse,
-  Sparkles,
   Grid3X3,
   Layers,
   Copy,
-  Download,
-  Eye,
+  Image as ImageIcon, 
   Shuffle,
-  Filter
+  Filter,
+  Sparkles,
+  Trophy,
+  Star,
+  Bookmark,
+  Trash2,
+  Download,
+  TrendingUp,
+  Target,
+  Eye,
+  Zap,
+  Award,
+  Heart
 } from "lucide-react";
 
+type SavedAd = {
+  id: string;
+  product_name: string;
+  framework_name: string;
+  headline: string;
+  body: string;
+  cta: string;
+  visual_concept: string;
+  image_prompt: string;
+  final_score: number;
+  is_top_ad: boolean;
+  created_at: string;
+};
+
 export default function AdsGeneratorPage() {
-  const [activeTab, setActiveTab] = useState<string>("classic");
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("framework");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
-  const [result, setResult] = useState<AdsResult | null>(null);
   const [frameworkResults, setFrameworkResults] = useState<AdCreative[] | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState("");
   const [parsedLanguage, setParsedLanguage] = useState("");
 
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [scoreFilter, setScoreFilter] = useState<string>("all");
+  const [frameworkSearch, setFrameworkSearch] = useState("");
   const [shuffledFrameworks, setShuffledFrameworks] = useState<AdFramework[]>(() => 
     [...adFrameworks].sort(() => Math.random() - 0.5)
   );
@@ -59,7 +79,28 @@ export default function AdsGeneratorPage() {
   const [promise, setPromise] = useState("");
   const [audience, setAudience] = useState("");
   const [price, setPrice] = useState("");
+  const [productType, setProductType] = useState("");
   const [frameworkCount, setFrameworkCount] = useState(7);
+
+  const [savedAds, setSavedAds] = useState<SavedAd[]>([]);
+  const [loadingSavedAds, setLoadingSavedAds] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "saved") {
+      loadSavedAds();
+    }
+  }, [activeTab]);
+
+  const loadSavedAds = async () => {
+    setLoadingSavedAds(true);
+    const { success, data, error } = await getSavedAds();
+    if (success && data) {
+      setSavedAds(data as SavedAd[]);
+    } else if (error) {
+      toast.error("Erro ao carregar anúncios salvos");
+    }
+    setLoadingSavedAds(false);
+  };
 
   const handleShuffleFrameworks = () => {
     setShuffledFrameworks([...adFrameworks].sort(() => Math.random() - 0.5));
@@ -79,40 +120,21 @@ export default function AdsGeneratorPage() {
     setSelectedFrameworks(shuffled.slice(0, count).map(f => f.id));
   };
 
-  const filteredFrameworks = categoryFilter === "all" 
-    ? shuffledFrameworks 
-    : shuffledFrameworks.filter(f => f.category === categoryFilter);
+  const filteredFrameworks = shuffledFrameworks.filter(f => {
+    const matchesCategory = categoryFilter === "all" || f.category === categoryFilter;
+    const matchesSearch = frameworkSearch === "" || 
+      f.name.toLowerCase().includes(frameworkSearch.toLowerCase()) ||
+      f.description.toLowerCase().includes(frameworkSearch.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
-  async function onSubmit(formData: FormData) {
-    setLoading(true);
-    setResult(null);
-
-    const product = formData.get("productName") as string;
-    const language = formData.get("language") as string;
-    setCurrentProjectName(`${product} Ads`);
-    setParsedLanguage(language);
-
-    const params = {
-      productName: product,
-      targetAudience: formData.get("targetAudience") as string,
-      price: formData.get("price") as string,
-      uniqueMechanism: formData.get("uniqueMechanism") as string,
-      platform: formData.get("platform") as string,
-      country: "Brazil",
-      language: language,
-    };
-
-    const { success, data, error } = await generateAds(params);
-
-    if (success && data) {
-      setResult(data);
-      toast.success(`Ad creatives generated in ${language}!`);
-    } else {
-      toast.error(error || "Failed to generate creatives.");
-    }
-    
-    setLoading(false);
-  }
+  const filteredResults = frameworkResults?.filter(c => {
+    if (scoreFilter === "top" && !c.isTopAd) return false;
+    if (scoreFilter === "high" && (c.score?.finalScore ?? 0) < 70) return false;
+    if (scoreFilter === "medium" && ((c.score?.finalScore ?? 0) < 55 || (c.score?.finalScore ?? 0) >= 70)) return false;
+    if (scoreFilter === "low" && (c.score?.finalScore ?? 0) >= 55) return false;
+    return true;
+  }) ?? [];
 
   async function handleGenerateFrameworkAds() {
     if (!productName || !promise || !audience) {
@@ -135,11 +157,12 @@ export default function AdsGeneratorPage() {
       language: parsedLanguage || "Português",
       selectedFrameworks: selectedFrameworks.length > 0 ? selectedFrameworks : undefined,
       count: selectedFrameworks.length > 0 ? undefined : frameworkCount,
+      productType,
     });
 
     if (success && data && data.length > 0) {
       setFrameworkResults(data);
-      toast.success(`${data.length} ad creatives gerados!`);
+      toast.success(`${data.length} ad creatives gerados com sucesso!`);
     } else {
       toast.error(error || "Erro ao gerar creatives.");
     }
@@ -147,25 +170,35 @@ export default function AdsGeneratorPage() {
     setFrameworkLoading(false);
   }
 
-  async function handleSave() {
-    if (activeTab === "classic" && result) {
-      toast.loading("Saving to project...", { id: "save-ads" });
-      const { success, message, error } = await saveAdsToProject(result, currentProjectName);
+  async function handleSaveAll() {
+    if (!frameworkResults || frameworkResults.length === 0) return;
+    
+    toast.loading("Salvando creatives...", { id: "save-ads" });
+    const { success, message, error } = await saveFrameworkAdsToProject(frameworkResults, currentProjectName);
 
-      if (success) {
-        toast.success(message, { id: "save-ads" });
-      } else {
-        toast.error(error, { id: "save-ads" });
-      }
-    } else if (activeTab === "framework" && frameworkResults) {
-      toast.loading("Salvando creatives...", { id: "save-ads" });
-      const { success, message, error } = await saveFrameworkAdsToProject(frameworkResults, currentProjectName);
+    if (success) {
+      toast.success(message, { id: "save-ads" });
+    } else {
+      toast.error(error, { id: "save-ads" });
+    }
+  }
 
-      if (success) {
-        toast.success(message, { id: "save-ads" });
-      } else {
-        toast.error(error, { id: "save-ads" });
-      }
+  async function handleSaveSingleAd(creative: AdCreative) {
+    const { success, message, error } = await saveSingleAdToDatabase(creative, productName);
+    if (success) {
+      toast.success(message);
+    } else {
+      toast.error(error || "Erro ao salvar anúncio");
+    }
+  }
+
+  async function handleDeleteSavedAd(adId: string) {
+    const { success, message, error } = await deleteSavedAd(adId);
+    if (success) {
+      toast.success(message);
+      setSavedAds(prev => prev.filter(ad => ad.id !== adId));
+    } else {
+      toast.error(error || "Erro ao excluir");
     }
   }
 
@@ -191,224 +224,22 @@ export default function AdsGeneratorPage() {
           <Megaphone className="w-8 h-8 text-pink-600" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Creative Ads Engine</h1>
-          <p className="text-muted-foreground">40 frameworks de alta conversão para seus anúncios.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Ads Creator Pro</h1>
+          <p className="text-muted-foreground">40 frameworks • Scoring inteligente • Copy Hormozi • Niche Intelligence</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
-          <TabsTrigger value="classic" className="gap-2">
-            <AlignLeft className="w-4 h-4" />
-            Clássico
-          </TabsTrigger>
           <TabsTrigger value="framework" className="gap-2">
             <Grid3X3 className="w-4 h-4" />
             Framework Ads
           </TabsTrigger>
+          <TabsTrigger value="saved" className="gap-2">
+            <Bookmark className="w-4 h-4" />
+            Salvos ({savedAds.length})
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="classic">
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-            <Card className="xl:col-span-4 h-fit sticky top-24 border-none shadow-md">
-              <CardHeader>
-                <CardTitle>Ad Parameters</CardTitle>
-                <CardDescription>Configure targeting variables for the ad network.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form action={onSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="productName">Product Name</Label>
-                    <Input id="productName" name="productName" placeholder="e.g., The Growth System" required />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="targetAudience">Target Audience</Label>
-                    <Input id="targetAudience" name="targetAudience" placeholder="e.g., Agency Owners" required />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price Point / Offer</Label>
-                    <Input id="price" name="price" placeholder="e.g., $997 or 'Free Masterclass'" required />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="uniqueMechanism">Unique Mechanism</Label>
-                    <Textarea 
-                      id="uniqueMechanism" 
-                      name="uniqueMechanism" 
-                      placeholder='e.g., The Arbitrage Protocol.' 
-                      className="min-h-[80px]"
-                      required 
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="platform">Traffic Platform</Label>
-                    <Input id="platform" name="platform" placeholder="Facebook/Instagram, TikTok..." required />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 border-t pt-4 mt-2 border-slate-100">
-                    <LanguageSelect />
-                  </div>
-
-                  <Button type="submit" className="w-full bg-pink-600 hover:bg-pink-700 text-white shadow-lg mt-6" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating Hooks...
-                      </>
-                    ) : (
-                      <>
-                        <Megaphone className="mr-2 h-4 w-4" />
-                        Write Creatives
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <div className="xl:col-span-8 flex flex-col gap-6">
-              {!result && !loading && (
-                <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-slate-50/50">
-                  <div className="p-4 bg-white rounded-full shadow-sm mb-4">
-                    <Megaphone className="w-8 h-8 text-slate-400" />
-                  </div>
-                  <h3 className="text-xl font-medium text-slate-700">Awaiting Targeting Data</h3>
-                  <p className="text-slate-500 max-w-sm text-center mt-2 text-sm">
-                    Submit product variables to generate native translated hooks, video scripts, and ad body copy.
-                  </p>
-                </div>
-              )}
-
-              {loading && (
-                <div className="flex flex-col items-center justify-center h-[600px] border-2 border-dashed rounded-xl bg-pink-50/30">
-                  <Loader2 className="w-12 h-12 text-pink-600 animate-spin mb-4" />
-                  <h3 className="text-xl font-medium text-slate-700 animate-pulse">Modeling Psychology...</h3>
-                  <p className="text-slate-500 text-sm mt-2">Connecting emotional triggers for local compliance.</p>
-                </div>
-              )}
-
-              {result && !loading && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  
-                  <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-2 text-pink-600 font-medium tracking-tight">
-                      <CheckCircle2 className="w-5 h-5" />
-                      Performance Creatives Locked
-                    </div>
-                     <div className="flex items-center gap-3">
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
-                        Language: {parsedLanguage}
-                      </span>
-                      <Button onClick={handleSave} className="bg-slate-900 text-white hover:bg-slate-800 shadow-md">
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Creatives
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Card className="border-none shadow-md overflow-hidden bg-white">
-                    <div className="bg-gradient-to-r from-pink-50 to-white px-6 py-4 border-b border-pink-100 flex items-center justify-between">
-                      <h3 className="font-bold flex items-center gap-2 text-pink-900">
-                        <AlignLeft className="w-5 h-5 text-pink-500" /> Primary Ad Copy (Long Form)
-                      </h3>
-                       <span className="text-xs uppercase tracking-wider font-bold text-pink-500 border border-pink-200 px-2 py-1 rounded bg-white">
-                         Scroll-Stopping Hook
-                       </span>
-                    </div>
-                    <CardContent className="p-6">
-                      <h2 className="text-2xl font-black mb-4 tracking-tight leading-tight text-slate-900">
-                        {result.scrollStoppingHook}
-                      </h2>
-                      <p className="text-slate-700 leading-relaxed whitespace-pre-line text-[15px]">
-                        {result.primaryAdCopy}
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border-none shadow-sm border border-slate-200 bg-slate-50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                           <MousePointerClick className="w-4 h-4 text-slate-400" /> Retargeting (Short)
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-slate-700 leading-relaxed font-medium">
-                          &ldquo;{result.shortAdCopy}&rdquo;
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-none shadow-sm bg-rose-50 border-rose-100">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-rose-800 flex items-center gap-2">
-                           <HeartPulse className="w-4 h-4" /> Emotional Triggers
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        {result.emotionalTriggers.map((trigger, i) => (
-                          <div key={i} className="text-sm text-rose-900 font-medium">
-                            • {trigger}
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <Card className="border-none shadow-md border-l-4 border-l-purple-500">
-                    <CardHeader className="bg-slate-50 pb-4 border-b">
-                       <CardTitle className="flex items-center gap-2 text-slate-800">
-                         <Video className="w-5 h-5 text-purple-600" /> UGC Video Script Template
-                       </CardTitle>
-                       <CardDescription>Hand this directly to your creator or read it yourself.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                      <div className="bg-slate-900 text-purple-100 p-6 rounded-lg font-mono text-sm leading-relaxed whitespace-pre-line">
-                        {result.videoAdScript}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card className="border-none shadow-sm border border-blue-100 bg-blue-50/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-700 flex items-center gap-2">
-                          <ImageIcon className="w-4 h-4" /> Image/Banner Headlines
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {result.imageHeadlines.map((headline, i) => (
-                          <div key={i} className="bg-white p-3 rounded shadow-sm border border-blue-100 font-bold text-slate-800">
-                            {headline}
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-none shadow-sm border border-emerald-100 bg-emerald-50/50">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-2">
-                          <MousePointerClick className="w-4 h-4" /> CTA Suggestions
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        {result.callsToAction.map((cta, i) => (
-                          <div key={i} className="bg-white p-3 rounded shadow-sm border border-emerald-100 font-bold text-slate-800 flex justify-between items-center">
-                            {cta}
-                            <Button size="sm" variant="outline" className="border-emerald-200 text-emerald-600 h-7 text-xs ml-2">Use CTA</Button>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </TabsContent>
 
         <TabsContent value="framework">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
@@ -441,18 +272,25 @@ export default function AdsGeneratorPage() {
                       className="flex-1"
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
-                      Aleatório ({frameworkCount})
+                      Aleatório
                     </Button>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    <Filter className="w-4 h-4 text-slate-500" />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Buscar framework..."
+                        value={frameworkSearch}
+                        onChange={(e) => setFrameworkSearch(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
                     <select 
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                      className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                     >
-                      <option value="all">Todas Categorias</option>
+                      <option value="all">Todos</option>
                       <option value="conversion">Conversão</option>
                       <option value="awareness">Consciência</option>
                       <option value="retargeting">Retargeting</option>
@@ -460,7 +298,7 @@ export default function AdsGeneratorPage() {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto p-1">
+                  <div className="grid grid-cols-2 gap-2 max-h-[350px] overflow-y-auto p-1">
                     {filteredFrameworks.map((framework) => (
                       <button
                         key={framework.id}
@@ -501,12 +339,21 @@ export default function AdsGeneratorPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="nicheFW">Nicho</Label>
+                    <Label htmlFor="productTypeFW">Tipo de Produto</Label>
+                    <Input 
+                      id="productTypeFW" 
+                      value={productType}
+                      onChange={(e) => setProductType(e.target.value)}
+                      placeholder="Ex: Curso Online, Ebook, Mentoria" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nicheFW">Nicho *</Label>
                     <Input 
                       id="nicheFW" 
                       value={niche}
                       onChange={(e) => setNiche(e.target.value)}
-                      placeholder="Ex: Saúde e Emagrecimento" 
+                      placeholder="Ex: Saúde, Emagrecimento, Marketing" 
                     />
                   </div>
                   <div className="space-y-2">
@@ -581,7 +428,7 @@ export default function AdsGeneratorPage() {
                   </div>
                   <h3 className="text-xl font-medium text-slate-700">Preview dos Creatives</h3>
                   <p className="text-slate-500 max-w-sm text-center mt-2 text-sm">
-                    Selecione frameworks e clique em &quot;Gerar com Frameworks&quot; para criar seus ads.
+                    Selecione frameworks e clique em &quot;Gerar com Frameworks&quot; para criar seus ads com scoring inteligente.
                   </p>
                 </div>
               )}
@@ -590,105 +437,262 @@ export default function AdsGeneratorPage() {
                 <div className="flex flex-col items-center justify-center h-[800px] border-2 border-dashed rounded-xl bg-pink-50/30">
                   <Loader2 className="w-16 h-16 text-pink-600 animate-spin mb-6" />
                   <h3 className="text-xl font-medium text-slate-700 animate-pulse">Criando creatives com IA...</h3>
-                  <p className="text-slate-500 text-sm mt-2">Aplicando {selectedFrameworks.length > 0 ? selectedFrameworks.length : frameworkCount} frameworks de alta conversão.</p>
+                  <p className="text-slate-500 text-sm mt-2">Aplicando estrutura Hormozi + Niche Intelligence + Scoring</p>
                 </div>
               )}
 
               {frameworkResults && !frameworkLoading && (
                 <div className="space-y-6">
-                  <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                  <div className="flex flex-wrap justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
                     <div className="flex items-center gap-2 text-pink-600 font-medium tracking-tight">
                       <CheckCircle2 className="w-5 h-5" />
                       {frameworkResults.length} Creatives Gerados
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
-                        {selectedFrameworks.length > 0 ? `${selectedFrameworks.length} frameworks` : `${frameworkCount} aleatórios`}
+                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full ml-2">
+                        TOP 3 Selecionados
                       </span>
-                      <Button onClick={handleSave} className="bg-slate-900 text-white hover:bg-slate-800 shadow-md">
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <select 
+                        value={scoreFilter}
+                        onChange={(e) => setScoreFilter(e.target.value)}
+                        className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                      >
+                        <option value="all">Todos Scores</option>
+                        <option value="top">TOP Ads Only</option>
+                        <option value="high">Alto (70+)</option>
+                        <option value="medium">Médio (55-70)</option>
+                      </select>
+                      <Button onClick={handleSaveAll} className="bg-slate-900 text-white hover:bg-slate-800 shadow-md">
                         <Save className="w-4 h-4 mr-2" />
-                        Salvar Creatives
+                        Salvar Todos
                       </Button>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-6">
-                    {frameworkResults.map((creative) => (
-                      <Card key={creative.id} className="border-none shadow-lg overflow-hidden">
-                        <div className={`px-6 py-4 border-b flex items-center justify-between ${
-                          creative.frameworkId.includes('oferta') || creative.frameworkId.includes('hard') 
-                            ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-200'
-                            : creative.frameworkId.includes('checklist') || creative.frameworkId.includes('passo')
-                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
-                            : creative.frameworkId.includes('ebook') || creative.frameworkId.includes('pov')
-                            ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
-                            : 'bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200'
+                    {filteredResults.map((creative, index) => {
+                      const scoreBadge = creative.score ? getScoreBadge(creative.score.finalScore) : null;
+                      
+                      return (
+                        <Card key={creative.id} className={`border-none shadow-lg overflow-hidden ${
+                          creative.isTopAd ? 'ring-2 ring-pink-500' : ''
                         }`}>
-                          <div>
-                            <span className={`text-xs px-2 py-1 rounded border font-medium ${getCategoryColor(
-                              adFrameworks.find(f => f.id === creative.frameworkId)?.category || 'native'
-                            )}`}>
-                              {creative.frameworkName}
-                            </span>
-                            <span className="ml-2 text-xs text-slate-500">
-                              {PSYCHOLOGICAL_TRIGGER_LABELS[
-                                adFrameworks.find(f => f.id === creative.frameworkId)?.psychologicalTrigger || 'curiosity'
-                              ]}
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => copyToClipboard(`${creative.headline}\n\n${creative.body}\n\n${creative.cta}`, 'Copy')}
-                            >
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy
-                            </Button>
-                          </div>
-                        </div>
-                        <CardContent className="p-6 space-y-4">
-                          <div>
-                            <h3 className="font-bold text-lg text-slate-900 mb-2">{creative.headline}</h3>
-                            <p className="text-slate-700 whitespace-pre-line">{creative.body}</p>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 p-3 bg-slate-100 rounded-lg">
-                            <MousePointerClick className="w-4 h-4 text-slate-500" />
-                            <span className="font-semibold text-slate-800">{creative.cta}</span>
-                          </div>
-
-                          <div className="border-t pt-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Eye className="w-4 h-4 text-blue-500" />
-                              <span className="text-sm font-medium text-slate-700">Conceito Visual</span>
+                          <div className={`px-6 py-4 border-b flex items-center justify-between flex-wrap gap-2 ${
+                            creative.isTopAd 
+                              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white'
+                              : creative.frameworkId.includes('oferta') || creative.frameworkId.includes('hard') 
+                              ? 'bg-gradient-to-r from-red-50 to-pink-50 border-red-200'
+                              : creative.frameworkId.includes('checklist') || creative.frameworkId.includes('passo')
+                              ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+                              : creative.frameworkId.includes('ebook') || creative.frameworkId.includes('pov')
+                              ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200'
+                              : 'bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200'
+                          }`}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {creative.isTopAd && (
+                                <span className="bg-white/20 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                                  <Trophy className="w-3 h-3" />
+                                  TOP {index + 1}
+                                </span>
+                              )}
+                              <span className={`text-xs px-2 py-1 rounded border font-medium ${
+                                creative.isTopAd 
+                                  ? 'bg-white/20 text-white border-white/30'
+                                  : getCategoryColor(adFrameworks.find(f => f.id === creative.frameworkId)?.category || 'native')
+                              }`}>
+                                {creative.frameworkName}
+                              </span>
+                              {scoreBadge && (
+                                <span className={`text-xs px-2 py-1 rounded font-bold flex items-center gap-1 ${scoreBadge.bgColor} ${scoreBadge.color}`}>
+                                  <Award className="w-3 h-3" />
+                                  {creative.score?.finalScore}% {scoreBadge.label}
+                                </span>
+                              )}
                             </div>
-                            <p className="text-sm text-slate-600 mb-3">{creative.visualConcept}</p>
-                            
-                            <div className="flex items-center gap-2 mb-2">
-                              <ImageIcon className="w-4 h-4 text-purple-500" />
-                              <span className="text-sm font-medium text-slate-700">Image Prompt (DALL-E)</span>
+                            <div className="flex gap-2">
                               <Button 
                                 size="sm" 
-                                variant="ghost"
-                                onClick={() => copyToClipboard(creative.imagePrompt, 'Image Prompt')}
-                                className="ml-auto"
+                                variant={creative.isTopAd ? "outline" : "ghost"}
+                                className={creative.isTopAd ? "border-white/30 text-white hover:bg-white/20" : ""}
+                                onClick={() => handleSaveSingleAd(creative)}
                               >
-                                <Copy className="w-3 h-3 mr-1" />
-                                Copiar
+                                <Bookmark className="w-4 h-4 mr-1" />
+                                Salvar
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant={creative.isTopAd ? "outline" : "ghost"}
+                                className={creative.isTopAd ? "border-white/30 text-white hover:bg-white/20" : ""}
+                                onClick={() => copyToClipboard(`${creative.headline}\n\n${creative.body}\n\n${creative.cta}`, 'Copy')}
+                              >
+                                <Copy className="w-4 h-4 mr-1" />
+                                Copy
                               </Button>
                             </div>
-                            <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-xs leading-relaxed">
-                              {creative.imagePrompt}
-                            </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          
+                          {creative.score && (
+                            <div className="px-6 py-3 bg-slate-50 border-b flex gap-4 flex-wrap">
+                              <div className="flex items-center gap-1">
+                                <Zap className="w-4 h-4 text-amber-500" />
+                                <span className="text-xs text-slate-600">Hook:</span>
+                                <span className="text-xs font-bold text-slate-800">{creative.score.hookScore}%</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Eye className="w-4 h-4 text-blue-500" />
+                                <span className="text-xs text-slate-600">Clareza:</span>
+                                <span className="text-xs font-bold text-slate-800">{creative.score.clarityScore}%</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Heart className="w-4 h-4 text-rose-500" />
+                                <span className="text-xs text-slate-600">Emoção:</span>
+                                <span className="text-xs font-bold text-slate-800">{creative.score.emotionScore}%</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Target className="w-4 h-4 text-emerald-500" />
+                                <span className="text-xs text-slate-600">Conversão:</span>
+                                <span className="text-xs font-bold text-slate-800">{creative.score.conversionScore}%</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <CardContent className="p-6 space-y-4">
+                            <div>
+                              <h3 className="font-bold text-xl text-slate-900 mb-2">{creative.headline}</h3>
+                              <p className="text-slate-700 whitespace-pre-line">{creative.body}</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 p-4 bg-gradient-to-r from-pink-50 to-rose-50 rounded-lg border border-pink-100">
+                              <MousePointerClick className="w-5 h-5 text-pink-600" />
+                              <span className="font-bold text-lg text-slate-800">{creative.cta}</span>
+                            </div>
+
+                            <div className="border-t pt-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Eye className="w-4 h-4 text-blue-500" />
+                                <span className="text-sm font-medium text-slate-700">Conceito Visual</span>
+                              </div>
+                              <p className="text-sm text-slate-600 mb-3">{creative.visualConcept}</p>
+                              
+                              <div className="flex items-center gap-2 mb-2">
+                                <ImageIcon className="w-4 h-4 text-purple-500" />
+                                <span className="text-sm font-medium text-slate-700">Image Prompt (DALL-E)</span>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  onClick={() => copyToClipboard(creative.imagePrompt, 'Image Prompt')}
+                                  className="ml-auto"
+                                >
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Copiar
+                                </Button>
+                              </div>
+                              <div className="bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-xs leading-relaxed">
+                                {creative.imagePrompt}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 </div>
               )}
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="saved">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Bookmark className="w-5 h-5 text-pink-600" />
+                Anúncios Salvos
+              </h2>
+              <Button variant="outline" onClick={loadSavedAds} size="sm">
+                <Loader2 className={`w-4 h-4 mr-2 ${loadingSavedAds ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+            </div>
+
+            {loadingSavedAds && (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 text-pink-600 animate-spin" />
+              </div>
+            )}
+
+            {!loadingSavedAds && savedAds.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-[400px] border-2 border-dashed rounded-xl bg-slate-50/50">
+                <Bookmark className="w-12 h-12 text-slate-300 mb-4" />
+                <h3 className="text-lg font-medium text-slate-700">Nenhum anúncio salvo</h3>
+                <p className="text-slate-500 text-sm mt-2">Salve seus melhores ads para acessá-los aqui depois.</p>
+              </div>
+            )}
+
+            {!loadingSavedAds && savedAds.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedAds.map((ad) => {
+                  const scoreBadge = getScoreBadge(ad.final_score);
+                  
+                  return (
+                    <Card key={ad.id} className="border border-slate-200 shadow-sm">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="text-xs text-slate-500">{ad.framework_name}</span>
+                            <CardTitle className="text-base mt-1">{ad.headline}</CardTitle>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`text-xs px-2 py-1 rounded font-bold ${scoreBadge.bgColor} ${scoreBadge.color}`}>
+                              {ad.final_score}% {scoreBadge.label}
+                            </span>
+                            {ad.is_top_ad && (
+                              <span className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded flex items-center gap-1">
+                                <Trophy className="w-3 h-3" />
+                                TOP
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-slate-600 line-clamp-2 mb-3">{ad.body}</p>
+                        <div className="flex items-center gap-2 text-sm text-slate-500 mb-3">
+                          <MousePointerClick className="w-4 h-4" />
+                          <span>{ad.cta}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => copyToClipboard(`${ad.headline}\n\n${ad.body}\n\n${ad.cta}`, 'Ad')}
+                          >
+                            <Copy className="w-3 h-3 mr-1" />
+                            Copy
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => copyToClipboard(ad.image_prompt, 'Image Prompt')}
+                          >
+                            <ImageIcon className="w-3 h-3 mr-1" />
+                            Image
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => handleDeleteSavedAd(ad.id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 ml-auto"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
