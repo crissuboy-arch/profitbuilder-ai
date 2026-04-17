@@ -4,6 +4,7 @@ import { openai, DEFAULT_MODEL, parseOpenAIResponse } from "@/lib/openai";
 import { saveGenerationToDatabase } from "@/lib/projects";
 import { createClient } from "@/utils/supabase/server";
 import { adFrameworks, getRandomFrameworks } from "./adFrameworks";
+import { copyArchitectures, getRandomArchitectures } from "./copyArchitectures";
 import { getNicheProfile, scoreCreative, rankCreatives, type NicheProfile } from "./adScorer";
 
 export type AdsResult = {
@@ -38,6 +39,8 @@ export type AdCreative = {
   id: string;
   frameworkId: string;
   frameworkName: string;
+  architectureId?: string;
+  architectureName?: string;
   headline: string;
   body: string;
   cta: string;
@@ -56,7 +59,9 @@ export type GenerateFrameworkAdsParams = {
   promise: string;
   language: string;
   selectedFrameworks?: string[];
+  selectedArchitectures?: string[];
   count?: number;
+  architectureCount?: number;
   productType?: string;
 };
 
@@ -124,80 +129,89 @@ export async function generateFrameworkAds(
     
     const frameworks = params.selectedFrameworks && params.selectedFrameworks.length > 0
       ? adFrameworks.filter(f => params.selectedFrameworks!.includes(f.id))
-      : getRandomFrameworks(params.count || 7);
+      : getRandomFrameworks(params.count || 5);
 
-    if (frameworks.length === 0) {
+    const architectures = params.selectedArchitectures && params.selectedArchitectures.length > 0
+      ? copyArchitectures.filter(a => params.selectedArchitectures!.includes(a.id))
+      : getRandomArchitectures(params.architectureCount || 2);
+
+    if (frameworks.length === 0 && architectures.length === 0) {
       return {
         success: false,
-        error: isPT ? "Nenhum framework selecionado." : "No frameworks selected.",
+        error: isPT ? "Selecione pelo menos um framework ou copy style." : "Select at least one framework or copy style.",
       };
     }
 
     const toneInstructions = getToneInstructions(nicheProfile, isPT);
     
-    const hormoziInstructions = isPT
-      ? `ESTRUTURA HORMOZI (P-A-S-T):
-- PROBLEMA: Identifique a dor mais profunda do público (máximo 2 linhas)
-- AGREMIÇÃO: Agite o problema, mostre as consequências (2-3 linhas)
-- SOLUÇÃO: Apresente seu produto como a solução inevitável (2-3 linhas)
-- TRANSFORMAÇÃO: Mostre o resultado final desejado (1-2 linhas)
-- CTA: Urgência + ação clara
-
-Cada ad deve seguir esta estrutura de forma NATURAL e PODEROSA.`
-      : `HORMOZI STRUCTURE (P-A-S-T):
-- PROBLEM: Identify the deepest pain of your audience (max 2 lines)
-- AGITATION: Stir up the problem, show consequences (2-3 lines)
-- SOLUTION: Present your product as the inevitable solution (2-3 lines)
-- TRANSFORMATION: Show the desired end result (1-2 lines)
-- CTA: Urgency + clear action
-
-Each ad must follow this structure NATURALLY and POWERFULLY.`;
+    const architecturesJson = architectures.map(a => ({
+      id: a.id,
+      name: a.name,
+      emoji: a.emoji,
+      description: a.description,
+      funnelStage: a.funnelStage,
+      toneStyle: a.toneStyle,
+      structure: a.structure,
+    }));
 
     const frameworksJson = frameworks.map(f => ({
       id: f.id,
       name: f.name,
       description: f.description,
-      psychologicalTrigger: f.psychologicalTrigger,
-      headlineTemplate: f.headlineTemplate,
-      bodyTemplate: f.bodyTemplate,
-      ctaTemplate: f.ctaTemplate,
+      visualLogic: f.visualLogic,
       imagePromptTemplate: f.imagePromptTemplate,
     }));
 
-    const systemPrompt = `You are a world-class direct response copywriter specializing in high-converting social media ads.
-You create ultra-converting ad creatives using proven psychological frameworks and the Hormozi P-A-S-T structure.
+    const copyInstructions = architectures.length > 0
+      ? `COPY ARCHITECTURES TO USE:\n${architecturesJson.map(a => `- ${a.emoji} ${a.name} (${a.funnelStage}): ${a.structure}`).join("\n")}`
+      : `Use PAS (Problem → Agitation → Solution) structure by default.`;
+
+    const systemPrompt = `You are a world-class direct response copywriter.
+You create ultra-converting ad creatives combining VISUAL FRAMEWORKS + COPY ARCHITECTURES.
 
 ${toneInstructions}
 
-${hormoziInstructions}
+${copyInstructions}
 
 IMPORTANT: Return ALL text natively in ${params.language}. Never mix languages.
 
-For each framework provided, generate a complete ad creative with HORMOZI-STYLE copy:
-1. headline - Must be SCROLL-STOPPING, specific to the product and niche
-2. body - MUST follow P-A-S-T structure: Problem → Agitation → Solution → Transformation → CTA
-3. cta - Action-oriented, create urgency
-4. visualConcept - Brief description of the visual treatment
-5. imagePrompt - DALL-E ready prompt with: composition, lighting, emotional tone, NO text, NO watermark
+Generate ad creatives combining a VISUAL FRAMEWORK (for design/layout) with a COPY ARCHITECTURE (for copy structure).
 
-You MUST format your response as a valid JSON object with this exact schema:
+For each creative:
+1. headline - SCROLL-STOPPING, specific to product and audience, can include numbers
+2. body - Follow the COPY ARCHITECTURE structure precisely
+3. cta - Action-oriented, create urgency or curiosity
+4. visualConcept - Describe how the VISUAL FRAMEWORK elements should look
+5. imagePrompt - DALL-E ready prompt: composition, lighting, emotional tone, NO text, NO watermark
+6. frameworkId / frameworkName - From the visual framework used
+7. architectureId / architectureName - From the copy architecture used
+
+You MUST format your response as a valid JSON object:
 {
   "creatives": [
     {
-      "frameworkId": "framework_id",
-      "frameworkName": "Framework Name",
-      "headline": "The ad headline - be specific, emotional, with numbers or strong words",
-      "body": "HORMOZI P-A-S-T COPY:\n\nPROBLEMA: [Deep pain point]\n\nAGREMIÇÃO: [Consequences of not solving]\n\nSOLUÇÃO: [Why your product is the answer]\n\nTRANSFORMAÇÃO: [End result promise]\n\nCTA: [Urgency + action]",
-      "cta": "Call to action text",
-      "visualConcept": "Visual treatment description",
-      "imagePrompt": "DALL-E ready image prompt"
+      "frameworkId": "visual_framework_id",
+      "frameworkName": "Visual Framework Name",
+      "architectureId": "copy_architecture_id",
+      "architectureName": "Copy Architecture Name",
+      "headline": "Compelling headline",
+      "body": "Body following copy architecture structure",
+      "cta": "Call to action",
+      "visualConcept": "Visual description",
+      "imagePrompt": "DALL-E prompt"
     }
   ]
 }`;
 
-    const userPrompt = `Generate ${frameworks.length} ad creatives using these frameworks:
+    const creativeCount = Math.min(10, Math.max(frameworks.length, architectures.length) * 2);
+    
+    const userPrompt = `Generate ${creativeCount} ad creatives combining:
 
+VISUAL FRAMEWORKS:
 ${JSON.stringify(frameworksJson, null, 2)}
+
+COPY ARCHITECTURES:
+${JSON.stringify(architecturesJson, null, 2)}
 
 PRODUCT DATA:
 - Product: ${params.productName}
@@ -207,20 +221,17 @@ PRODUCT DATA:
 - Target Audience: ${params.targetAudience}
 - Price: ${params.price}
 
-NICHE INTELLIGENCE DATA:
+NICHE INTELLIGENCE:
 - Tone: ${nicheProfile.tone}
-- Key Pain Points: ${nicheProfile.painPoints.slice(0, 3).join(", ")}
-- Key Promises: ${nicheProfile.promises.slice(0, 3).join(", ")}
-- Emotional Triggers: ${nicheProfile.emotionalTriggers.slice(0, 3).join(", ")}
-- Vocabulary to use: ${nicheProfile.vocabulary.slice(0, 5).join(", ")}
+- Pain Points: ${nicheProfile.painPoints.slice(0, 3).join(", ")}
+- Promises: ${nicheProfile.promises.slice(0, 3).join(", ")}
+- Triggers: ${nicheProfile.emotionalTriggers.slice(0, 3).join(", ")}
 
-For each creative:
-- Fill in the templates with real product details
-- Use niche-specific vocabulary
-- Make headlines punchy and specific to the audience
-- Body must follow HORMOZI P-A-S-T structure EXACTLY
-- CTAs should create urgency or curiosity
-- Image prompts should be detailed for AI image generation`;
+Create ads that COMBINE visual frameworks with copy architectures.
+Each ad should use one framework + one architecture.
+Make headlines punchy and emotional.
+Make body copy follow the architecture structure EXACTLY.
+Image prompts should reference the visual framework.`;
 
     const response = await openai.chat.completions.create({
       model: DEFAULT_MODEL,
@@ -239,6 +250,8 @@ For each creative:
     let creatives: AdCreative[] = (parsed.creatives || []).map((c: { 
       frameworkId: string; 
       frameworkName: string; 
+      architectureId?: string;
+      architectureName?: string;
       headline: string; 
       body: string; 
       cta: string; 
@@ -249,6 +262,8 @@ For each creative:
         id: crypto.randomUUID(),
         frameworkId: c.frameworkId,
         frameworkName: c.frameworkName,
+        architectureId: c.architectureId,
+        architectureName: c.architectureName,
         headline: c.headline || "",
         body: c.body || "",
         cta: c.cta || "",
@@ -286,28 +301,28 @@ function getToneInstructions(nicheProfile: NicheProfile, isPT: boolean): string 
   switch (nicheProfile.tone) {
     case "aggressive":
       return isPT
-        ? "TOM: AGRESSIVO E DIRETO. Use palavras fortes como 'pare de perder', 'acabe com', 'nunca mais'. Seja confiante e provocativo. Faça o público sentir que está perdendo algo."
-        : "TONE: AGGRESSIVE AND DIRECT. Use strong words like 'stop losing', 'end', 'never again'. Be confident and provocative. Make the audience feel they are missing out.";
+        ? "TOM: AGRESSIVO E DIRETO. Use palavras fortes como 'pare de perder', 'acabe com', 'nunca mais'. Seja confiante e provocativo."
+        : "TONE: AGGRESSIVE AND DIRECT. Use strong words like 'stop losing', 'end', 'never again'. Be confident and provocative.";
     case "empathetic":
       return isPT
-        ? "TOM: EMPÁTICO E CARING. Conecte-se emocionalmente com a dor do público. Use palavras como 'eu entendo', 'como você se sente', 'não se preocupe'. Faça o público sentir que você entende."
-        : "TONE: EMPATHETIC AND CARING. Connect emotionally with the audience's pain. Use words like 'I understand', 'how you feel', 'don't worry'. Make the audience feel understood.";
+        ? "TOM: EMPÁTICO E CARING. Conecte-se emocionalmente com a dor do público. Use palavras como 'eu entendo', 'como você se sente'."
+        : "TONE: EMPATHETIC AND CARING. Connect emotionally with the audience's pain.";
     case "luxury":
       return isPT
-        ? "TOM: LUXO E EXCLUSIVIDADE. Use palavras como 'exclusivo', 'premium', 'seleto', 'você merece'. Mostre que este é um produto para poucos."
-        : "TONE: LUXURY AND EXCLUSIVITY. Use words like 'exclusive', 'premium', 'select', 'you deserve'. Show this is a product for few.";
+        ? "TOM: LUXO E EXCLUSIVIDADE. Use palavras como 'exclusivo', 'premium', 'seleto', 'você merece'."
+        : "TONE: LUXURY AND EXCLUSIVITY. Use words like 'exclusive', 'premium', 'you deserve'.";
     case "urgent":
       return isPT
-        ? "TOM: URGENTE E IMPERATIVO. Use frases como 'agora mesmo', 'não espere', 'última chance', 'vagas limitadas'. Crie FOMO forte."
-        : "TONE: URGENT AND IMPERATIVE. Use phrases like 'right now', 'don't wait', 'last chance', 'limited spots'. Create strong FOMO.";
+        ? "TOM: URGENTE E IMPERATIVO. Use frases como 'agora mesmo', 'não espere', 'última chance'."
+        : "TONE: URGENT AND IMPERATIVE. Use phrases like 'right now', 'don't wait', 'last chance'.";
     case "casual":
       return isPT
-        ? "TOM: CASUAL E PARECIDO COM AMIGO. Fale como se estivesse conversando. Use gírias quando apropriado. Seja autêntico e próximo."
-        : "TONE: CASUAL AND FRIENDLY. Talk like you're having a conversation. Use slang when appropriate. Be authentic and approachable.";
+        ? "TOM: CASUAL E PARECIDO COM AMIGO. Fale como se estivesse conversando. Seja autêntico."
+        : "TONE: CASUAL AND FRIENDLY. Talk like you're having a conversation.";
     default:
       return isPT
-        ? "TOM: PROFISSIONAL MAS ACESSÍVEL. Balanceie autoridade com acessibilidade. Seja claro e direto."
-        : "TONE: PROFESSIONAL BUT ACCESSIBLE. Balance authority with accessibility. Be clear and direct.";
+        ? "TOM: PROFISSIONAL MAS ACESSÍVEL. Balanceie autoridade com acessibilidade."
+        : "TONE: PROFESSIONAL BUT ACCESSIBLE. Balance authority with accessibility.";
   }
 }
 
@@ -353,6 +368,7 @@ export async function saveSingleAdToDatabase(
         product_name: productName,
         framework_id: creative.frameworkId,
         framework_name: creative.frameworkName,
+        architecture_name: creative.architectureName,
         headline: creative.headline,
         body: creative.body,
         cta: creative.cta,
