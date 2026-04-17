@@ -246,3 +246,23 @@ create table if not exists public.saved_ads (
 alter table public.saved_ads enable row level security;
 create policy "Users manage own saved_ads." on public.saved_ads
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- 10. Ads Analytics Reports
+create table if not exists public.ads_reports (
+  id                  uuid default uuid_generate_v4() primary key,
+  user_id            uuid references auth.users(id) on delete cascade not null,
+  report_name        text not null,
+  file_name          text not null,
+  file_type          text not null,  -- csv | xlsx
+  raw_data           jsonb not null default '[]',  -- Original parsed data
+  summary            jsonb,  -- {totalSpend, totalRevenue, totalConversions, totalClicks, totalImpressions, avgCTR, avgCPC, avgCPA, avgROAS}
+  top_ads            jsonb default '[]',  -- Top performing ads
+  worst_ads          jsonb default '[]',  -- Worst performing ads
+  ai_insights        text,  -- AI-generated insights
+  suggested_frameworks jsonb default '[]',  -- Suggested frameworks from Ads Generator
+  created_at         timestamptz default timezone('utc'::text, now()) not null
+);
+
+alter table public.ads_reports enable row level security;
+create policy "Users manage own ads_reports." on public.ads_reports
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

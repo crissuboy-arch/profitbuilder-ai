@@ -6,7 +6,7 @@ import { useLanguage } from "@/lib/i18n";
 import { createClient } from "@/utils/supabase/client";
 import { cn } from "@/lib/utils";
 import {
-  BarChart, Lightbulb, Megaphone, Package, PenTool, Search,
+  BarChart, BarChart3, Lightbulb, Megaphone, Package, PenTool, Search,
   ShoppingCart, Wand2, ArrowRight, BookOpen, Users,
   Layers, TrendingUp, Zap,
 } from "lucide-react";
@@ -81,6 +81,16 @@ const TOOLS = [
     bg:       "bg-red-400/10",
     border:   "group-hover:border-red-400/30",
     href:     "/dashboard/modules/ads-generator",
+  },
+  {
+    key:      "nav.adsAnalytics",
+    desc_en:  "Upload Meta Ads reports and get AI-powered insights.",
+    desc_pt:  "Carregue relatórios do Meta Ads e получите insights de IA.",
+    icon:     BarChart3,
+    color:    "text-blue-400",
+    bg:       "bg-blue-400/10",
+    border:   "group-hover:border-blue-400/30",
+    href:     "/dashboard/modules/ads-analytics",
   },
   {
     key:      "nav.seoGenerator",

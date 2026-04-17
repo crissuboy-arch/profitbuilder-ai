@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n";
 import {
   BarChart,
+  BarChart3,
   BookOpen,
   LayoutDashboard,
   Lightbulb,
@@ -84,6 +85,13 @@ const NAV_ITEMS = [
     href:  "/dashboard/modules/ads-generator",
     color: "text-red-400",
     glow:  "group-hover:drop-shadow-[0_0_6px_rgb(248,113,113)]",
+  },
+  {
+    key:   "nav.adsAnalytics",
+    icon:  BarChart3,
+    href:  "/dashboard/modules/ads-analytics",
+    color: "text-blue-400",
+    glow:  "group-hover:drop-shadow-[0_0_6px_rgb(96,165,250)]",
   },
   {
     key:   "nav.seoGenerator",
