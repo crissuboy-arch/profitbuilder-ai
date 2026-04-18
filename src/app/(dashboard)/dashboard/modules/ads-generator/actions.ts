@@ -423,6 +423,29 @@ export async function getSavedAds() {
   }
 }
 
+export async function generateAdImage(
+  imagePrompt: string
+): Promise<{ success: boolean; base64?: string; error?: string }> {
+  try {
+    const resp = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: imagePrompt,
+      n: 1,
+      size: "1024x1024",
+      quality: "hd",
+    });
+    const url = resp.data?.[0]?.url;
+    if (!url) throw new Error("No URL returned");
+    const res = await fetch(url);
+    const buffer = await res.arrayBuffer();
+    const base64 = `data:image/png;base64,${Buffer.from(buffer).toString("base64")}`;
+    return { success: true, base64 };
+  } catch (error: any) {
+    console.error("generateAdImage error:", error);
+    return { success: false, error: "Falha ao gerar imagem." };
+  }
+}
+
 export async function deleteSavedAd(adId: string) {
   try {
     const supabase = await createClient();

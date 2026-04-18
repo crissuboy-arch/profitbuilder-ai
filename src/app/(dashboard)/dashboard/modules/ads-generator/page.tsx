@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { 
   generateFrameworkAds,
+  generateAdImage,
   saveFrameworkAdsToProject,
   saveSingleAdToDatabase,
   getSavedAds,
@@ -88,6 +89,9 @@ export default function AdsGeneratorPage() {
   const [productType, setProductType] = useState("");
   const [frameworkCount, setFrameworkCount] = useState(5);
   const [architectureCount, setArchitectureCount] = useState(2);
+
+  const [adImages, setAdImages] = useState<Record<string, string>>({});
+  const [generatingImageFor, setGeneratingImageFor] = useState<string | null>(null);
 
   const [savedAds, setSavedAds] = useState<SavedAd[]>([]);
   const [loadingSavedAds, setLoadingSavedAds] = useState(false);
@@ -227,6 +231,19 @@ export default function AdsGeneratorPage() {
     } else {
       toast.error(error || "Erro ao excluir");
     }
+  }
+
+  async function handleGenerateAdImage(creative: AdCreative) {
+    if (!creative.imagePrompt) return;
+    setGeneratingImageFor(creative.id);
+    const { success, base64, error } = await generateAdImage(creative.imagePrompt);
+    if (success && base64) {
+      setAdImages(prev => ({ ...prev, [creative.id]: base64 }));
+      toast.success("Imagem gerada!");
+    } else {
+      toast.error(error || "Falha ao gerar imagem.");
+    }
+    setGeneratingImageFor(null);
   }
 
   const copyToClipboard = (text: string, label: string) => {
@@ -707,25 +724,47 @@ export default function AdsGeneratorPage() {
                                 <span className={`text-sm font-medium ${creative.isTopAd ? 'text-white/80' : 'text-slate-700'}`}>Visual</span>
                               </div>
                               <p className={`text-sm mb-3 ${creative.isTopAd ? 'text-white/70' : 'text-slate-600'}`}>{creative.visualConcept}</p>
-                              
+
                               <div className="flex items-center gap-2 mb-2">
                                 <ImageIcon className={`w-4 h-4 ${creative.isTopAd ? 'text-white/70' : 'text-purple-500'}`} />
-                                <span className={`text-sm font-medium ${creative.isTopAd ? 'text-white/80' : 'text-slate-700'}`}>DALL-E Prompt</span>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost"
-                                  onClick={() => copyToClipboard(creative.imagePrompt, 'Prompt')}
-                                  className={`ml-auto ${creative.isTopAd ? 'text-white/80 hover:bg-white/10' : ''}`}
+                                <span className={`text-sm font-medium ${creative.isTopAd ? 'text-white/80' : 'text-slate-700'}`}>Criativo Visual</span>
+                              </div>
+
+                              {adImages[creative.id] ? (
+                                <div className="space-y-2">
+                                  <img
+                                    src={adImages[creative.id]}
+                                    alt="Criativo gerado"
+                                    className="w-full rounded-lg object-cover"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => handleGenerateAdImage(creative)}
+                                    disabled={generatingImageFor === creative.id}
+                                  >
+                                    {generatingImageFor === creative.id ? (
+                                      <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Gerando...</>
+                                    ) : (
+                                      <><ImageIcon className="w-3 h-3 mr-1" />Regenerar Imagem</>
+                                    )}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className={`w-full ${creative.isTopAd ? 'bg-white text-slate-900 hover:bg-white/90' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+                                  onClick={() => handleGenerateAdImage(creative)}
+                                  disabled={generatingImageFor === creative.id}
                                 >
-                                  <Copy className="w-3 h-3 mr-1" />
-                                  Copiar
+                                  {generatingImageFor === creative.id ? (
+                                    <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Gerando Imagem...</>
+                                  ) : (
+                                    <><ImageIcon className="w-3 h-3 mr-1" />Gerar Imagem com DALL-E</>
+                                  )}
                                 </Button>
-                              </div>
-                              <div className={`p-3 rounded-lg font-mono text-xs leading-relaxed ${
-                                creative.isTopAd ? 'bg-white/10 text-white/90' : 'bg-slate-900 text-slate-100'
-                              }`}>
-                                {creative.imagePrompt}
-                              </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
