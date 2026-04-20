@@ -596,14 +596,7 @@ export async function generateBookCover(
 ): Promise<{ success: boolean; base64?: string; error?: string }> {
   try {
     const style = COVER_STYLES[genre] ?? "professional book cover art, even studio lighting, vibrant colors throughout";
-    const prompt = `Professional publishing-quality book cover art for a ${genre} book titled "${title}" by ${author}. Art style: ${style}. Portrait orientation, full bleed illustration. CRITICAL REQUIREMENTS: 
-1. Absolutely NO text, NO letters, NO words, NO numbers anywhere in the image
-2. EVERY portion of the image must be FULLY and EVENLY ILLUMINATED - no dark corners, no dark edges, no dark bottom half
-3. Use only BRIGHT professional photography studio lighting - the entire image should look like it was lit with softbox lights
-4. No vignette effects, no dark gradients, no shadows covering any part of the image
-5. The subject/illustration should be evenly lit from all angles
-6. This is for a BOOK COVER - it needs to look premium and fully visible in all areas
-7. Bright, saturated colors throughout the entire frame - nothing dark or shadowy`;
+    const prompt = `Professional book cover, photorealistic, bright even lighting, high contrast, cinematic quality, no dark overlay, no abstract art. Book: "${title}" by ${author}. Genre: ${genre}. Style: ${style}. Portrait orientation, full bleed. 4K quality, premium publishing standard. CRITICAL: absolutely NO text, NO letters, NO words, NO numbers anywhere. Studio softbox lighting illuminating the ENTIRE image uniformly — no dark corners, no vignette, no dark gradients. Vivid saturated colors throughout every pixel of the frame.`;
 
     const resp = await openai.images.generate({
       model: "dall-e-3",
@@ -633,10 +626,10 @@ export async function generateChapterImage(
   try {
     const desc = imageDesc?.trim() || `Scene from chapter ${chapterNumber}: ${chapterTitle}`;
     const styleNote = playbookStyle
-      ? "Dark anime/manga illustration style, dramatic lighting, cel-shaded, cinematic panel composition, deep shadows, vibrant accent colors on black background."
-      : `Book illustration for a ${genre} book. Warm realistic style, publishing quality.`;
+      ? "Professional book illustration, photorealistic, bright even lighting, high contrast, cinematic quality, no dark overlay, no abstract art. Dark anime/manga aesthetic with vibrant accent colors, 4K quality."
+      : `Professional book illustration, photorealistic, bright even lighting, high contrast, cinematic quality, no dark overlay, no abstract art. Genre: ${genre}, 4K quality.`;
 
-    const prompt = `${styleNote} Chapter ${chapterNumber}: "${chapterTitle}". Scene: ${desc} No text, no letters, no words.`;
+    const prompt = `${styleNote} Chapter ${chapterNumber}: "${chapterTitle}". Scene: ${desc} No text, no letters, no words, no watermarks.`;
 
     const resp = await openai.images.generate({
       model: "dall-e-3",
@@ -887,29 +880,13 @@ export async function savePlaybook(
       return { success: false, error: "Você precisa estar logado para compartilhar." };
     }
 
-    // Store only text content — skip chapter images to stay within payload limits
+    // Store only text content — skip all images to stay within Supabase row limits
     const chapters = params.result.chapters.map((ch) => ({
       number:      ch.number,
       title:       ch.title,
       blocks:      ch.blocks,
       imageBase64: null,
     }));
-
-    // Compress cover if present (remove data URI prefix, limit size)
-    let compressedCover = null;
-    if (params.coverBase64) {
-      try {
-        const base64Data = params.coverBase64.replace(/^data:image\/\w+;base64,/, "");
-        // Skip if too large (>1MB base64) to avoid payload limits
-        if (base64Data.length > 1_500_000) {
-          console.warn("Cover image too large, skipping...");
-        } else {
-          compressedCover = params.coverBase64;
-        }
-      } catch {
-        console.warn("Failed to process cover image");
-      }
-    }
 
     const { data, error } = await supabase
       .from("playbooks")
@@ -918,7 +895,7 @@ export async function savePlaybook(
         title:        params.result.title,
         author:       params.authorName || params.result.author,
         genre:        params.genre,
-        cover_base64: compressedCover,
+        cover_base64: null,
         chapters,
       })
       .select("id")
@@ -926,11 +903,10 @@ export async function savePlaybook(
 
     if (error) {
       console.error("savePlaybook error:", error);
-      // Provide more specific error messages
-      if (error.message.includes("payload")) {
-        return { success: false, error: "O conteúdo é muito grande. Tente缩短 o livro." };
+      if (error.message.includes("payload") || error.message.includes("too large")) {
+        return { success: false, error: "O conteúdo é muito grande. Reduza o número de páginas e tente novamente." };
       }
-      return { success: false, error: error.message };
+      return { success: false, error: `Erro ao salvar: ${error.message}` };
     }
 
     return { success: true, id: data.id };

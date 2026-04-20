@@ -472,12 +472,6 @@ export default function BookGeneratorPage() {
       // ── Cover Page ──────────────────────────────────────────────────────────
       if (coverBase64) {
         doc.addImage(coverBase64, "PNG", 0, 0, PW, PH);
-        // Add subtle text overlay area at bottom
-        doc.saveGraphicsState();
-        doc.setGState(new GState({ opacity: 0.7 }));
-        doc.setFillColor(10, 10, 50);
-        doc.rect(0, PH * 0.65, PW, PH * 0.35, "F");
-        doc.restoreGraphicsState();
       } else {
         doc.setFillColor(...DARK);
         doc.rect(0, 0, PW, PH, "F");
@@ -531,12 +525,6 @@ export default function BookGeneratorPage() {
       doc.setDrawColor(...GOLD);
       doc.setLineWidth(0.5);
       doc.line(ML, 20, PW - ML, 20);
-
-      // Back cover header
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      setColor(...GOLD);
-      doc.text("CONTRACAPA", PW / 2, 28, { align: "center" });
 
       // Book title on back
       doc.setFont("helvetica", "bold");
@@ -819,7 +807,7 @@ export default function BookGeneratorPage() {
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={chapterImages[ch.number]} alt={ch.title} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/90" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/50" />
               </>
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-slate-900 via-purple-950 to-black flex items-center justify-center">

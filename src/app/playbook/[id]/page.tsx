@@ -166,7 +166,7 @@ export default function PlaybookViewerPage() {
               alt={ch.title}
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/90" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/50" />
           </>
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-slate-900 via-purple-950 to-black flex items-center justify-center">
