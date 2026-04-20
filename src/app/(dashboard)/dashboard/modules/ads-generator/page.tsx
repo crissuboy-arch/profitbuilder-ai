@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { 
   generateFrameworkAds,
   generateAdImage,
@@ -64,7 +65,9 @@ type SavedAd = {
   created_at: string;
 };
 
-export default function AdsGeneratorPage() {
+function AdsGeneratorContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<string>("framework");
   const [frameworkLoading, setFrameworkLoading] = useState(false);
   const [frameworkResults, setFrameworkResults] = useState<AdCreative[] | null>(null);
@@ -113,6 +116,23 @@ export default function AdsGeneratorPage() {
       loadSavedAds();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    const frameworksParam = searchParams.get("frameworks");
+    if (frameworksParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedFrameworks(frameworksParam.split(",").filter(Boolean));
+    }
+    const nameParam = searchParams.get("productName");
+    const promiseParam = searchParams.get("promise");
+    const audienceParam = searchParams.get("audience");
+    const priceParam = searchParams.get("price");
+    if (nameParam) setProductName(nameParam);
+    if (promiseParam) setPromise(promiseParam);
+    if (audienceParam) setAudience(audienceParam);
+    if (priceParam) setPrice(priceParam);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleShuffleFrameworks = () => {
     setShuffledFrameworks([...adFrameworks].sort(() => Math.random() - 0.5));
@@ -250,6 +270,20 @@ export default function AdsGeneratorPage() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copiado!`);
+  };
+
+  const handleCreateSalesPage = () => {
+    const topAd = frameworkResults?.find(c => c.isTopAd) ?? frameworkResults?.[0];
+    if (!topAd) return;
+    const params = new URLSearchParams({
+      name: productName,
+      promise: topAd.headline,
+      audience: audience,
+      price: price,
+      concept: `${productName}. ${topAd.body.substring(0, 300)}`,
+      mechanism: topAd.headline,
+    });
+    router.push(`/dashboard/modules/sales-page-generator?${params.toString()}`);
   };
 
   const getCategoryColor = (category: string) => {
@@ -615,6 +649,14 @@ export default function AdsGeneratorPage() {
                         <Save className="w-4 h-4 mr-2" />
                         Salvar Todos
                       </Button>
+                      <Button
+                        onClick={handleCreateSalesPage}
+                        className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+                      >
+                        <PenTool className="w-4 h-4 mr-2" />
+                        Criar Sales Page
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
                     </div>
                   </div>
 
@@ -860,5 +902,13 @@ export default function AdsGeneratorPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function AdsGeneratorPage() {
+  return (
+    <Suspense>
+      <AdsGeneratorContent />
+    </Suspense>
   );
 }

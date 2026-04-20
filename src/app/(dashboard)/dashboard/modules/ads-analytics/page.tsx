@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,8 @@ import {
   Zap,
   Award,
   X,
-  Save
+  Save,
+  Megaphone
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,6 +73,7 @@ type SavedReport = {
 };
 
 export default function AdsAnalyticsPage() {
+  const router = useRouter();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -307,26 +310,31 @@ export default function AdsAnalyticsPage() {
 
     if (metrics.avgROAS >= 3) {
       frameworks.push(
-        { id: "pas", name: "Problem-Agitate-Solution", reason: "High ROAS - proven to convert" },
-        { id: "story", name: "Storytelling Framework", reason: "Strong engagement - use narrative" }
+        { id: "dor_solucao", name: "Dor → Solução", reason: "ROAS alto — comprova conversão por contraste emocional" },
+        { id: "revelacao", name: "Revelação", reason: "Engajamento forte — narrativa de descoberta" }
       );
     } else if (metrics.avgROAS >= 1.5) {
       frameworks.push(
-        { id: "aida", name: "AIDA Model", reason: "Moderate ROAS - optimize funnel" },
-        { id: "features-benefits", name: "Features-Benefits", reason: "Clear value proposition needed" }
+        { id: "super_headline", name: "Super Headline", reason: "ROAS moderado — headline poderosa melhora CTR" },
+        { id: "oferta_beneficios", name: "Oferta + Benefícios", reason: "Proposta de valor mais clara aumenta conversão" }
       );
     } else {
       frameworks.push(
-        { id: "hook-story-offer", name: "Hook-Story-Offer", reason: "Low ROAS - need stronger hooks" },
-        { id: "star", name: "STAR Method", reason: "Build trust before selling" }
+        { id: "problema_vs_solucao", name: "Problema vs. Solução", reason: "ROAS baixo — contraste direto aumenta urgência" },
+        { id: "prova_explicada", name: "Prova Explicada", reason: "Construa confiança antes de vender" }
       );
     }
 
     if (metrics.avgCTR < 1) {
-      frameworks.push({ id: "curiosity-gap", name: "Curiosity Gap", reason: "Low CTR - need more intriguing hooks" });
+      frameworks.push({ id: "caixinha_pergunta", name: "Caixinha de Perguntas", reason: "CTR baixo — perguntas criam curiosidade e cliques" });
     }
 
     return frameworks;
+  };
+
+  const handleSendToAdsGenerator = (frameworkIds: string[]) => {
+    const params = new URLSearchParams({ frameworks: frameworkIds.join(",") });
+    router.push(`/dashboard/modules/ads-generator?${params.toString()}`);
   };
 
   const processFile = async () => {
@@ -868,7 +876,7 @@ export default function AdsAnalyticsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {suggestedFrameworks.map((framework, index) => (
                       <div key={index} className="p-4 border rounded-lg">
                         <div className="flex justify-between items-start">
@@ -876,7 +884,12 @@ export default function AdsAnalyticsPage() {
                             <h4 className="font-medium">{framework.name}</h4>
                             <p className="text-sm text-muted-foreground mt-1">{framework.reason}</p>
                           </div>
-                          <Button size="sm" variant="outline">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSendToAdsGenerator([framework.id])}
+                            title="Usar no Ads Generator"
+                          >
                             <ArrowRight className="w-4 h-4" />
                           </Button>
                         </div>
@@ -886,13 +899,17 @@ export default function AdsAnalyticsPage() {
                       <p className="text-center text-muted-foreground py-4">No recommendations available</p>
                     )}
                   </div>
-                  
-                  <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <h4 className="font-medium text-sm mb-2">💡 Pro Tip</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Use these frameworks in the Ads Generator to create new ads based on your top performers&apos; winning elements.
-                    </p>
-                  </div>
+
+                  {suggestedFrameworks.length > 0 && (
+                    <Button
+                      className="w-full mt-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                      onClick={() => handleSendToAdsGenerator(suggestedFrameworks.map(f => f.id))}
+                    >
+                      <Megaphone className="w-4 h-4 mr-2" />
+                      Criar Anúncios com Esses Frameworks
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>

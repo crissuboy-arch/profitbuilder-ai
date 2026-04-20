@@ -83,6 +83,8 @@ function SalesPageGeneratorContent() {
   const prefillAudience = searchParams.get("audience") || "";
   const prefillPrice = searchParams.get("price") || "";
   const prefillMechanism = searchParams.get("mechanism") || "";
+  const prefillName = searchParams.get("name") || "";
+  const prefillPromise = searchParams.get("promise") || "";
 
   const [activeTab, setActiveTab] = useState<"classic" | "template">("template");
   const [loading, setLoading] = useState(false);
@@ -97,9 +99,9 @@ function SalesPageGeneratorContent() {
   const [sectionToggles, setSectionToggles] = useState<SectionToggle>(DEFAULT_TOGGLES);
   const [showPreview, setShowPreview] = useState(false);
 
-  const [productName, setProductName] = useState("");
+  const [productName, setProductName] = useState(prefillName);
   const [niche, setNiche] = useState("");
-  const [promise, setPromise] = useState("");
+  const [promise, setPromise] = useState(prefillPromise);
   const [audience, setAudience] = useState(prefillAudience);
   const [price, setPrice] = useState(prefillPrice);
   const [originalPrice, setOriginalPrice] = useState("");
@@ -688,6 +690,15 @@ function SalesPageGeneratorContent() {
         </TabsContent>
 
         <TabsContent value="template">
+          {prefillName && (
+            <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Dados importados do Ads Generator</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Produto, promessa, público e preço foram preenchidos automaticamente. Revise e ajuste se necessário.</p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
             <div className="xl:col-span-4 space-y-6">
               <Card className="border-none shadow-md">
