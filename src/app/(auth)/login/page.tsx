@@ -81,7 +81,7 @@ export default async function LoginPage({
         </CardContent>
         <CardFooter className="flex justify-center border-t p-6">
           <p className="text-sm text-slate-500">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-blue-600 font-semibold hover:underline">
               Sign up
             </Link>

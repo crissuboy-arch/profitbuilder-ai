@@ -6,16 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { 
-  Loader2, 
-  Upload, 
-  FileSpreadsheet, 
-  TrendingUp, 
-  TrendingDown,
+import {
+  Loader2,
+  Upload,
+  FileSpreadsheet,
+  TrendingUp,
   DollarSign,
   MousePointerClick,
   Target,
@@ -24,9 +21,7 @@ import {
   Sparkles,
   ArrowRight,
   Trash2,
-  RefreshCw,
   BarChart3,
-  PieChart,
   Activity,
   Zap,
   Award,
@@ -895,7 +890,7 @@ export default function AdsAnalyticsPage() {
                   <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
                     <h4 className="font-medium text-sm mb-2">💡 Pro Tip</h4>
                     <p className="text-sm text-muted-foreground">
-                      Use these frameworks in the Ads Generator to create new ads based on your top performers' winning elements.
+                      Use these frameworks in the Ads Generator to create new ads based on your top performers&apos; winning elements.
                     </p>
                   </div>
                 </CardContent>

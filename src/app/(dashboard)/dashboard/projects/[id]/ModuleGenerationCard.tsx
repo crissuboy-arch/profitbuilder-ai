@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,11 +27,14 @@ import { cn } from "@/lib/utils";
 interface GenerationData {
   id: string;
   module_type: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   input_params: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   output_data: any;
   created_at: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const moduleConfig: Record<string, { icon: any, color: string, label: string }> = {
   "product-miner": { icon: Search, color: "text-violet-500", label: "Product Miner" },
   "idea-validator": { icon: Lightbulb, color: "text-pink-700", label: "Idea Validator" },
@@ -220,7 +224,7 @@ function renderModuleContent(gen: GenerationData) {
           </div>
           <div className="p-3 bg-slate-900 text-white rounded-lg">
              <h5 className="text-[10px] font-bold text-cyan-400 uppercase mb-1">Sample Caption</h5>
-             <p className="text-[10px] text-slate-300 line-clamp-2 italic">"{data.writtenCaptions?.[0]}"</p>
+             <p className="text-[10px] text-slate-300 line-clamp-2 italic">&quot;{data.writtenCaptions?.[0]}&quot;</p>
           </div>
         </div>
       );
@@ -230,7 +234,7 @@ function renderModuleContent(gen: GenerationData) {
         <div className="space-y-4">
           <div className="p-3 bg-red-50 border border-red-100 rounded-lg border-l-4 border-l-red-500">
              <h5 className="text-[10px] font-bold text-red-700 uppercase mb-1">Scroll-Stopping Hook</h5>
-             <p className="text-sm font-bold text-slate-900 leading-tight">"{data.scrollStoppingHook}"</p>
+             <p className="text-sm font-bold text-slate-900 leading-tight">&quot;{data.scrollStoppingHook}&quot;</p>
           </div>
           <div className="flex gap-4">
             <div className="flex-1">

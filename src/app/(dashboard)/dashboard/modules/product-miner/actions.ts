@@ -107,11 +107,11 @@ Focus on: real market gaps, underserved segments, validated demand signals, and 
     );
 
     return { success: true, data: parsed.ideas };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("generateProducts error:", error);
     return {
       success: false,
-      error: error.message || "Failed to generate product ideas.",
+      error: error instanceof Error ? error.message : "Failed to generate product ideas.",
     };
   }
 }

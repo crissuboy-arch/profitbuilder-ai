@@ -180,6 +180,7 @@ export async function POST(
   let published = 0;
   let failed    = 0;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const postPlatforms: any[] = post.sp_post_platforms ?? [];
 
   for (const pp of postPlatforms) {

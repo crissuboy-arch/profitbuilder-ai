@@ -440,7 +440,7 @@ export async function generateAdImage(
     const buffer = await res.arrayBuffer();
     const base64 = `data:image/png;base64,${Buffer.from(buffer).toString("base64")}`;
     return { success: true, base64 };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("generateAdImage error:", error);
     return { success: false, error: "Falha ao gerar imagem." };
   }

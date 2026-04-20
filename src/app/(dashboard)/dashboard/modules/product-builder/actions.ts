@@ -97,7 +97,7 @@ CRITICAL RULES:
       success: true,
       data: parsed,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error structuring product:", error);
     return {
       success: false,
@@ -153,7 +153,7 @@ CRITICAL:
 
     const parsed = parseOpenAIResponse<{ bonuses: string[] }>(response.choices[0].message.content);
     return { success: true, data: parsed.bonuses };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating bonuses:", error);
     return { success: false, error: "Failed to generate bonuses." };
   }
@@ -199,7 +199,7 @@ CRITICAL:
 
     const parsed = parseOpenAIResponse<{ formats: ComplementaryFormat[] }>(response.choices[0].message.content);
     return { success: true, data: parsed.formats };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating complementary formats:", error);
     return { success: false, error: "Failed to generate complementary formats." };
   }
@@ -288,7 +288,7 @@ ABSOLUTE RULES:
 
     const parsed = parseOpenAIResponse<EbookResult>(response.choices[0].message.content);
     return { success: true, data: parsed };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating ebook:", error);
     return { success: false, error: "Failed to generate ebook. Please try again." };
   }
@@ -335,7 +335,7 @@ CRITICAL:
 
     const parsed = parseOpenAIResponse<ViralHooksResult>(response.choices[0].message.content);
     return { success: true, data: parsed };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating viral hooks:", error);
     return { success: false, error: "Failed to generate viral hooks. Please try again." };
   }
@@ -357,7 +357,7 @@ export async function generateCoverImage(params: {
 
     const imageBase64 = response.data?.[0]?.b64_json;
     return { success: true, imageBase64 };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating cover image:", error);
     return { success: false, error: "Failed to generate cover image." };
   }
@@ -387,7 +387,7 @@ export async function generateChapterImages(params: {
       }
     }
     return { success: true, images };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating chapter images:", error);
     return { success: false, error: "Failed to generate chapter images." };
   }

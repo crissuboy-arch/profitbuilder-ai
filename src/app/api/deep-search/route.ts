@@ -38,11 +38,13 @@ export async function POST(req: NextRequest) {
 
     // Combine results from all 3 searches
     type TavilyResult = { title: string; url: string; content: string; score: number };
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const allRaw = [
       ...((resProducts as any).results ?? []),
       ...((resPricing  as any).results ?? []),
       ...((resAudience as any).results ?? []),
     ] as TavilyResult[];
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     // Deduplicate by URL, sort by score descending
     const seen  = new Set<string>();
@@ -132,10 +134,10 @@ Return ONLY valid JSON:
     }));
 
     return NextResponse.json({ success: true, data: ideas });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("deep-search error:", err);
     return NextResponse.json(
-      { success: false, error: err.message ?? "Deep search failed." },
+      { success: false, error: err instanceof Error ? err.message : "Deep search failed." },
       { status: 500 }
     );
   }

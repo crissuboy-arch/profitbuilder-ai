@@ -115,8 +115,8 @@ export default function ProductMinerPage() {
         } else {
           toast.error(json.error || "Deep search failed.");
         }
-      } catch (err: any) {
-        toast.error(err.message || "Network error.");
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Network error.");
       }
     } else {
       // ── Standard AI generation ───────────────────────────────────────────

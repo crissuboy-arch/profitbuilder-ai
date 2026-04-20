@@ -69,7 +69,7 @@ CRITICAL RULES:
       success: true,
       data: parsed,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating sales page:", error);
     return {
       success: false,
@@ -227,11 +227,11 @@ Retorne APENAS JSON válido com todos os campos preenchidos de forma detalhada e
     }
 
     return { success: true, data: generatedPage };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating template sales page:", error);
     return {
       success: false,
-      error: error.message || "Erro ao gerar página de vendas.",
+      error: error instanceof Error ? error.message : "Erro ao gerar página de vendas.",
     };
   }
 }

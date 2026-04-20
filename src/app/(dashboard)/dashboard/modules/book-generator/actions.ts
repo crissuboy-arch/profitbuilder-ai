@@ -150,7 +150,7 @@ ABSOLUTE RULES:
     const clean = raw.trim().replace(/^```[a-z]*\n?/, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(clean) as PublicationKit;
     return { success: true, data: parsed };
-  } catch (error: any) {
+  } catch (error) {
     console.error("generatePublicationKit error:", error);
     return { success: false, error: "Falha ao gerar kit de publicação." };
   }
@@ -463,7 +463,7 @@ export async function generateBook(
     const clean = raw.trim().replace(/^```[a-z]*\n?/, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(clean) as BookResult;
     return { success: true, data: parsed };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("generateBook error:", error);
     return { success: false, error: "Falha ao gerar o livro. Tente novamente." };
   }
@@ -515,7 +515,7 @@ You are working from an EXISTING manuscript. Apply the mode instructions above t
     const clean = raw.trim().replace(/^```[a-z]*\n?/, "").replace(/```$/, "").trim();
     const parsed = JSON.parse(clean) as BookResult;
     return { success: true, data: parsed };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("improveBookFromText error:", error);
     return { success: false, error: "Falha ao processar o livro. Tente novamente." };
   }
@@ -617,7 +617,7 @@ export async function generateBookCover(
     if (!url) throw new Error("No URL returned");
     const base64 = await fetchAsBase64(url);
     return { success: true, base64 };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("generateBookCover error:", error);
     return { success: false, error: "Falha ao gerar a capa." };
   }
@@ -650,7 +650,7 @@ export async function generateChapterImage(
     if (!url) throw new Error("No URL returned");
     const base64 = await fetchAsBase64(url);
     return { success: true, base64 };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`generateChapterImage error (ch.${chapterNumber}):`, error);
     return { success: false, error: `Falha na imagem do capítulo ${chapterNumber}.` };
   }
@@ -722,9 +722,9 @@ export async function saveBook(
     }
 
     return { success: true, id: data.id };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("saveBook catch:", err);
-    return { success: false, error: err.message ?? "Falha ao salvar livro." };
+    return { success: false, error: err instanceof Error ? err.message : "Falha ao salvar livro." };
   }
 }
 
@@ -750,8 +750,8 @@ export async function getMyBooks(): Promise<{
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: data as SavedBook[] };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "Falha ao carregar livros." };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Falha ao carregar livros." };
   }
 }
 
@@ -785,8 +785,8 @@ export async function getBook(id: string): Promise<{
         pageSize:     data.page_size,
       },
     };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "Falha ao carregar livro." };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Falha ao carregar livro." };
   }
 }
 
@@ -798,8 +798,8 @@ export async function deleteBook(
     const { error } = await supabase.from("books").delete().eq("id", id);
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message ?? "Falha ao deletar livro." };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : "Falha ao deletar livro." };
   }
 }
 
@@ -853,9 +853,9 @@ export async function updateBook(
     }
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("updateBook catch:", err);
-    return { success: false, error: err.message ?? "Falha ao atualizar livro." };
+    return { success: false, error: err instanceof Error ? err.message : "Falha ao atualizar livro." };
   }
 }
 
@@ -934,11 +934,12 @@ export async function savePlaybook(
     }
 
     return { success: true, id: data.id };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("savePlaybook catch:", err);
-    if (err.message?.includes("fetch")) {
+    const msg = err instanceof Error ? err.message : undefined;
+    if (msg?.includes("fetch")) {
       return { success: false, error: "Erro de conexão. Tente novamente." };
     }
-    return { success: false, error: err.message ?? "Falha ao salvar playbook." };
+    return { success: false, error: msg ?? "Falha ao salvar playbook." };
   }
 }

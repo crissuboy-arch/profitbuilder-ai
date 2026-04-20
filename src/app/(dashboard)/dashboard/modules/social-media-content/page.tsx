@@ -251,7 +251,7 @@ export default function SocialMediaGeneratorPage() {
                     <CardContent className="space-y-2">
                       {result.shortVideoHooks.map((hook, i) => (
                         <div key={i} className="bg-white p-3 rounded shadow-sm border border-orange-100 text-sm font-bold text-slate-800">
-                          "{hook}"
+                          &quot;{hook}&quot;
                         </div>
                       ))}
                     </CardContent>

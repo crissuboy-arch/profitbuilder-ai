@@ -84,7 +84,7 @@ CRITICAL RULES:
       success: true,
       data: parsed,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating SEO outline:", error);
     return {
       success: false,

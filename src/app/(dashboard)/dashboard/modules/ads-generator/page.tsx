@@ -96,12 +96,6 @@ export default function AdsGeneratorPage() {
   const [savedAds, setSavedAds] = useState<SavedAd[]>([]);
   const [loadingSavedAds, setLoadingSavedAds] = useState(false);
 
-  useEffect(() => {
-    if (activeTab === "saved") {
-      loadSavedAds();
-    }
-  }, [activeTab]);
-
   const loadSavedAds = async () => {
     setLoadingSavedAds(true);
     const { success, data, error } = await getSavedAds();
@@ -112,6 +106,13 @@ export default function AdsGeneratorPage() {
     }
     setLoadingSavedAds(false);
   };
+
+  useEffect(() => {
+    if (activeTab === "saved") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadSavedAds();
+    }
+  }, [activeTab]);
 
   const handleShuffleFrameworks = () => {
     setShuffledFrameworks([...adFrameworks].sort(() => Math.random() - 0.5));

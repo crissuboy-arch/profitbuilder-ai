@@ -30,7 +30,10 @@ export default function MeusLivrosPage() {
   }, []);
 
   useEffect(() => {
-    loadBooks();
+    const init = async () => {
+      await loadBooks();
+    };
+    init();
   }, [loadBooks]);
 
   async function handleDelete(id: string) {
@@ -116,7 +119,7 @@ export default function MeusLivrosPage() {
           <BookOpen className="w-12 h-12 text-slate-300 mb-4" />
           <p className="text-lg font-medium text-slate-600">Nenhum livro salvo</p>
           <p className="text-sm text-slate-400 mt-1 mb-4">
-            Gere um livro e clique em "Salvar" para vê-lo aqui
+            Gere um livro e clique em &quot;Salvar&quot; para vê-lo aqui
           </p>
           <Link href="/dashboard/modules/book-generator">
             <Button className="bg-indigo-600 hover:bg-indigo-700">

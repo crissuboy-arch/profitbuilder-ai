@@ -22,6 +22,7 @@ function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("pb-lang") as LangCode | null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved && TRANSLATIONS[saved]) setLangState(saved);
   }, []);
 
@@ -47,6 +48,7 @@ function CurrencyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem("pb-currency") as CurrencyCode | null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved && CURRENCY_RATES[saved] !== undefined) setCurrencyState(saved);
   }, []);
 

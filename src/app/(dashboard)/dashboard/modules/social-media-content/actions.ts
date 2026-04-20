@@ -67,7 +67,7 @@ CRITICAL RULES:
       success: true,
       data: parsed,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating social content:", error);
     return {
       success: false,

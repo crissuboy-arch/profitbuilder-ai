@@ -87,8 +87,8 @@ export async function getOrCreateProject(projectName: string): Promise<string> {
 export async function saveGenerationToDatabase(
   projectName: string,
   moduleType: string,
-  inputParams: any = {},
-  outputData: any = {}
+  inputParams: Record<string, unknown> = {},
+  outputData: Record<string, unknown> = {}
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     const user = await ensureUserInDatabase();
@@ -113,8 +113,8 @@ export async function saveGenerationToDatabase(
     }
 
     return { success: true, message: `Successfully saved to ${projectName}!` };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to save generation globally:", err);
-    return { success: false, error: err.message || "Failed to save generation." };
+    return { success: false, error: err instanceof Error ? err.message : "Failed to save generation." };
   }
 }

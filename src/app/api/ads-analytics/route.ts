@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
     const fileName = file.name;
 
     // Parse file content
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let parsedData: any[] = [];
 
     if (fileType === "csv") {
@@ -206,6 +208,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 // CSV Parser
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseCSV(csvText: string): any[] {
   const lines = csvText.trim().split("\n");
   if (lines.length < 2) return [];

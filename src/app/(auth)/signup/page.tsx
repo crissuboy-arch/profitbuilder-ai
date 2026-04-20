@@ -1,8 +1,5 @@
 import Link from "next/link";
 import { signup } from "../actions";
-import { SubmitButton } from "@/components/auth/submit-button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wand2 } from "lucide-react";
 import { Metadata } from "next";
@@ -17,7 +14,7 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<{ message?: string; error?: string }>;
 }) {
-  const { message, error } = await searchParams;
+  const { error } = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 font-[family-name:var(--font-geist-sans)] p-4">
         <form action={signup} className="w-full max-w-md">

@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { generateCheckout, saveCheckoutToProject, type CheckoutResult } from "./actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CountrySelect } from "@/components/shared/CountrySelect";
 import { LanguageSelect } from "@/components/shared/LanguageSelect";
 import { toast } from "sonner";
-import { Loader2, CreditCard, ShoppingCart, TrendingUp, ArrowDownRight, Layers, CreditCard as CardIcon, ShieldCheck, CheckCircle2, Save, FileCheck } from "lucide-react";
+import { Loader2, CreditCard, ShoppingCart, TrendingUp, ArrowDownRight, Layers, CreditCard as CardIcon, CheckCircle2, Save, FileCheck } from "lucide-react";
 
 export default function CheckoutGeneratorPage() {
   const [loading, setLoading] = useState(false);
@@ -279,7 +279,7 @@ export default function CheckoutGeneratorPage() {
                   <FileCheck className="w-8 h-8 text-blue-500 shrink-0" />
                   <div>
                     <h4 className="font-bold text-slate-800 mb-1">Thank You Page Copy</h4>
-                    <p className="text-slate-600 font-medium">"{result.thankYouPage}"</p>
+                    <p className="text-slate-600 font-medium">&quot;{result.thankYouPage}&quot;</p>
                   </div>
                 </CardContent>
               </Card>
