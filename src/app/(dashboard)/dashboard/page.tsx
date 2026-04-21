@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   BarChart, BarChart3, Lightbulb, Megaphone, Package, PenTool, Search,
   ShoppingCart, Wand2, ArrowRight, BookOpen, Users,
-  Layers, TrendingUp, Zap, Zap as ZapIcon,
+  Layers, TrendingUp, Zap, Rocket,
 } from "lucide-react";
 
 const TOOLS = [
@@ -221,11 +221,12 @@ export default function DashboardPage() {
             <p className="text-muted-foreground text-sm mt-1">{t("dash.subtitle")}</p>
           </div>
           <Link
-            href="/dashboard/modules/product-miner"
-            className="btn-cta inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shrink-0"
+            href="/dashboard/criar-produto"
+            className="btn-cta inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold shrink-0 shadow-lg shadow-[#00d4aa]/20"
           >
-            <Search className="w-4 h-4" />
-            {t("nav.productMiner")}
+            <Rocket className="w-4 h-4" />
+            Criar Meu Produto
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
       </div>
